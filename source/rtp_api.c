@@ -110,10 +110,10 @@ RtpResult_t Rtp_Init( RtpContext_t * pCtx )
 RtpResult_t Rtp_Serialize( RtpContext_t * pCtx,
                            const RtpPacket_t * pRtpPacket,
                            uint8_t * pBuffer,
-                           size_t * pLength )
+                           uint32_t * pLength )
 {
-    size_t i, serializedPacketLength, currentIndex = 0;
-    uint32_t firstWord, extensionHeader;
+    size_t i, currentIndex = 0;
+    uint32_t firstWord, extensionHeader, serializedPacketLength;
     RtpResult_t result = RTP_RESULT_OK;
 
     if( ( pCtx == NULL ) ||
@@ -227,7 +227,7 @@ RtpResult_t Rtp_Serialize( RtpContext_t * pCtx,
 
 RtpResult_t Rtp_DeSerialize( RtpContext_t * pCtx,
                              uint8_t * pSerializedPacket,
-                             size_t serializedPacketLength,
+                             uint32_t serializedPacketLength,
                              RtpPacket_t * pRtpPacket )
 {
     size_t i, currentIndex = 0;

@@ -9,11 +9,11 @@ RtpResult_t Rtp_Init( RtpContext_t * pCtx );
 RtpResult_t Rtp_Serialize( RtpContext_t * pCtx,
                            const RtpPacket_t * pRtpPacket,
                            uint8_t * pBuffer,
-                           size_t * pLength );
+                           uint32_t * pLength );
 
 RtpResult_t Rtp_DeSerialize( RtpContext_t * pCtx,
                              uint8_t * pSerializedPacket,
-                             size_t serializedPacketLength,
+                             uint32_t serializedPacketLength,
                              RtpPacket_t * pRtpPacket );
 
 #endif /* RTP_API_H */
