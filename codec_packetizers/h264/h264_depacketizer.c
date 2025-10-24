@@ -278,8 +278,8 @@ H264Result_t H264Depacketizer_GetNalu( H264DepacketizerContext_t * pCtx,
         if( ( packetType >= SINGLE_NALU_PACKET_TYPE_START ) &&
             ( packetType <= SINGLE_NALU_PACKET_TYPE_END ) )
         {
-            DepacketizeSingleNaluPacket( pCtx,
-                                         pNalu );
+            result = DepacketizeSingleNaluPacket( pCtx,
+                                                  pNalu );
         }
         else if( packetType == FU_A_PACKET_TYPE )
         {
