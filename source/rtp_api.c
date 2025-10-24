@@ -75,9 +75,20 @@ static RtpResult_t CalculateSerializedPacketLength( const RtpPacket_t * pRtpPack
 static RtpResult_t CalculateSerializedPacketLength( const RtpPacket_t * pRtpPacket,
                                                     size_t * pLength )
 {
-    size_t headerLength = RTP_HEADER_MIN_LENGTH +
-                          ( pRtpPacket->header.csrcCount * sizeof( uint32_t ) );
     RtpResult_t result = RTP_RESULT_OK;
+    size_t headerLength;
+
+    /* Validate CSRC count - RTP spec limits to 4 bits (0-15) */
+    if( pRtpPacket->header.csrcCount > 15 )
+    {
+        result = RTP_RESULT_MALFORMED_PACKET;
+    }
+
+    if( result == RTP_RESULT_OK )
+    {
+        headerLength = RTP_HEADER_MIN_LENGTH +
+                       ( pRtpPacket->header.csrcCount * sizeof( uint32_t ) );
+    }
 
     if( ( pRtpPacket->header.flags & RTP_HEADER_FLAG_EXTENSION ) != 0 )
     {
