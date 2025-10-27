@@ -224,7 +224,9 @@ H264Result_t H264Depacketizer_AddPacket( H264DepacketizerContext_t * pCtx,
     H264Result_t result = H264_RESULT_OK;
 
     if( ( pCtx == NULL ) ||
-        ( pPacket == NULL ) )
+        ( pPacket == NULL ) ||
+        ( pPacket->pPacketData == NULL ) ||
+        ( pPacket->packetDataLength == 0 ) )
     {
         result = H264_RESULT_BAD_PARAM;
     }
@@ -257,7 +259,8 @@ H264Result_t H264Depacketizer_GetNalu( H264DepacketizerContext_t * pCtx,
     uint8_t packetType;
 
     if( ( pCtx == NULL ) ||
-        ( pNalu == NULL ) )
+        ( pNalu == NULL ) ||
+        ( pNalu->pNaluData == NULL ) )
     {
         result = H264_RESULT_BAD_PARAM;
     }
@@ -267,6 +270,15 @@ H264Result_t H264Depacketizer_GetNalu( H264DepacketizerContext_t * pCtx,
         if( pCtx->packetCount == 0 )
         {
             result = H264_RESULT_NO_MORE_NALUS;
+        }
+    }
+
+    if( result == H264_RESULT_OK )
+    {
+        if( ( pCtx->tailIndex >= pCtx->packetsArrayLength ) ||
+            ( pCtx->pPacketsArray[ pCtx->tailIndex ].pPacketData == NULL ) )
+        {
+            result = H264_RESULT_BAD_PARAM;
         }
     }
 

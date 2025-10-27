@@ -314,6 +314,14 @@ H264Result_t H264Packetizer_GetPacket( H264PacketizerContext_t * pCtx,
 
     if( result == H264_RESULT_OK )
     {
+        if( pCtx->pNaluArray[ pCtx->tailIndex ].pNaluData == NULL )
+        {
+            result = H264_RESULT_BAD_PARAM;
+        }
+    }
+
+    if( result == H264_RESULT_OK )
+    {
         /* Are we in the middle of packetizing fragments of a NALU? */
         if( pCtx->currentlyProcessingPacket == H264_FU_A_PACKET )
         {
