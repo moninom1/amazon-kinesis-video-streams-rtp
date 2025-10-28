@@ -168,27 +168,35 @@ VP8Result_t VP8Depacketizer_GetFrame( VP8DepacketizerContext_t * pCtx,
     {
         pPacket = &( pCtx->pPacketsArray[ i ] );
 
-        payloadDescLength = ReadPayloadDescriptor( pPacket,
-                                                   pFrame );
-
-        if( pPacket->packetDataLength > payloadDescLength )
+        if( ( pPacket->packetDataLength < 1 ) ||
+            ( pPacket->packetDataLength < 2 &&
+              ( pPacket->pPacketData[ VP8_PAYLOAD_DESC_HEADER_OFFSET ] & VP8_PAYLOAD_DESC_X_BITMASK ) != 0 ) )
         {
-            if( ( pFrame->frameDataLength - curFrameDataIndex ) >= ( pPacket->packetDataLength - payloadDescLength ) )
-            {
-                memcpy( ( void * ) &( pFrame->pFrameData[ curFrameDataIndex ] ),
-                        ( const void * ) &( pPacket->pPacketData[ payloadDescLength ] ),
-                        pPacket->packetDataLength - payloadDescLength );
-
-                curFrameDataIndex += ( pPacket->packetDataLength - payloadDescLength );
-            }
-            else
-            {
-                result = VP8_RESULT_OUT_OF_MEMORY;
-            }
+            result = VP8_MALFORMED_PACKET;
         }
         else
         {
-            result = VP8_MALFORMED_PACKET;
+            payloadDescLength = ReadPayloadDescriptor( pPacket, pFrame );
+
+            if( pPacket->packetDataLength > payloadDescLength )
+            {
+                if( ( pFrame->frameDataLength - curFrameDataIndex ) >= ( pPacket->packetDataLength - payloadDescLength ) )
+                {
+                    memcpy( ( void * ) &( pFrame->pFrameData[ curFrameDataIndex ] ),
+                            ( const void * ) &( pPacket->pPacketData[ payloadDescLength ] ),
+                            pPacket->packetDataLength - payloadDescLength );
+
+                    curFrameDataIndex += ( pPacket->packetDataLength - payloadDescLength );
+                }
+                else
+                {
+                    result = VP8_RESULT_OUT_OF_MEMORY;
+                }
+            }
+            else
+            {
+                result = VP8_MALFORMED_PACKET;
+            }
         }
     }
 
