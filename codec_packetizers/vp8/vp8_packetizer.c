@@ -129,7 +129,9 @@ VP8Result_t VP8Packetizer_GetPacket( VP8PacketizerContext_t * pCtx,
     size_t frameDataLengthToSend;
 
     if( ( pCtx == NULL ) ||
-        ( pPacket == NULL ) )
+        ( pPacket == NULL ) ||
+        ( pPacket->pPacketData == NULL ) ||
+        ( pPacket->packetDataLength == 0 ) )
     {
         result = VP8_RESULT_BAD_PARAM;
     }
@@ -144,7 +146,8 @@ VP8Result_t VP8Packetizer_GetPacket( VP8PacketizerContext_t * pCtx,
 
     if( result == VP8_RESULT_OK )
     {
-        if( pPacket->packetDataLength > pCtx->payloadDescLength )
+        if( ( pPacket->packetDataLength > pCtx->payloadDescLength ) &&
+            ( pCtx->frameDataLength > pCtx->curFrameDataIndex ) )
         {
             memcpy( ( void * ) &( pPacket->pPacketData[ 0 ] ),
                     ( const void * ) &( pCtx->payloadDesc[ 0 ] ),

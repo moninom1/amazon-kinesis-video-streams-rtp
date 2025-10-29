@@ -14,80 +14,123 @@ static size_t ReadPayloadDescriptor( const VP8Packet_t * pPacket,
 {
     size_t curIndex = 0;
     uint8_t extensions;
+    int isValid = 1;
+
+    /* Basic packet validation */
+    if( pPacket->packetDataLength < 1 )
+    {
+        isValid = 0;
+    }
+    else if( pPacket->packetDataLength < 2 &&
+             ( pPacket->pPacketData[ VP8_PAYLOAD_DESC_HEADER_OFFSET ] & VP8_PAYLOAD_DESC_X_BITMASK ) != 0 )
+    {
+        isValid = 0;
+    }
 
     pFrame->frameProperties = 0;
-    if( ( pPacket->pPacketData[ VP8_PAYLOAD_DESC_HEADER_OFFSET ] & VP8_PAYLOAD_DESC_N_BITMASK ) != 0 )
+    if( isValid && ( pPacket->pPacketData[ VP8_PAYLOAD_DESC_HEADER_OFFSET ] & VP8_PAYLOAD_DESC_N_BITMASK ) != 0 )
     {
         pFrame->frameProperties |= VP8_FRAME_PROP_NON_REF_FRAME;
     }
 
-    if( ( pPacket->pPacketData[ VP8_PAYLOAD_DESC_HEADER_OFFSET ] & VP8_PAYLOAD_DESC_X_BITMASK ) != 0 )
+    if( isValid && ( pPacket->pPacketData[ VP8_PAYLOAD_DESC_HEADER_OFFSET ] & VP8_PAYLOAD_DESC_X_BITMASK ) != 0 )
     {
         extensions = pPacket->pPacketData[ VP8_PAYLOAD_DESC_EXT_OFFSET ];
 
         /* Location to read the next extension. */
         curIndex += 2;
 
-        if( ( extensions & VP8_PAYLOAD_DESC_EXT_I_BITMASK ) != 0 )
+        if( ( extensions & VP8_PAYLOAD_DESC_EXT_I_BITMASK ) != 0 &&
+              isValid )
         {
-            pFrame->frameProperties |= VP8_FRAME_PROP_PICTURE_ID_PRESENT;
-
-            if( ( pPacket->pPacketData[ curIndex ] & VP8_PAYLOAD_DESC_EXT_M_BITMASK ) != 0 )
+            if( curIndex >= pPacket->packetDataLength )
             {
-                pFrame->pictureId = ( ( pPacket->pPacketData[ curIndex ] & ~VP8_PAYLOAD_DESC_EXT_M_BITMASK ) << 8 );
-                pFrame->pictureId |= pPacket->pPacketData[ curIndex + 1 ];
-                curIndex += 2;
+                isValid = 0;
             }
             else
             {
-                pFrame->pictureId = pPacket->pPacketData[ curIndex ];
+                pFrame->frameProperties |= VP8_FRAME_PROP_PICTURE_ID_PRESENT;
+
+                if( ( pPacket->pPacketData[ curIndex ] & VP8_PAYLOAD_DESC_EXT_M_BITMASK ) != 0 )
+                {
+                    if( curIndex + 1 >= pPacket->packetDataLength )
+                    {
+                        isValid = 0;
+                    }
+                    else
+                    {
+                        pFrame->pictureId = ( ( pPacket->pPacketData[ curIndex ] & ~VP8_PAYLOAD_DESC_EXT_M_BITMASK ) << 8 );
+                        pFrame->pictureId |= pPacket->pPacketData[ curIndex + 1 ];
+                        curIndex += 2;
+                    }
+                }
+                else
+                {
+                    pFrame->pictureId = pPacket->pPacketData[ curIndex ];
+                    curIndex += 1;
+                }
+            }
+        }
+
+        if( ( extensions & VP8_PAYLOAD_DESC_EXT_L_BITMASK ) != 0 &&
+              isValid )
+        {
+            if( curIndex >= pPacket->packetDataLength )
+            {
+                isValid = 0;
+            }
+            else
+            {
+                pFrame->frameProperties |= VP8_FRAME_PROP_TL0PICIDX_PRESENT;
+
+                pFrame->tl0PicIndex = pPacket->pPacketData[ curIndex ];
                 curIndex += 1;
             }
         }
 
-        if( ( extensions & VP8_PAYLOAD_DESC_EXT_L_BITMASK ) != 0 )
+        if( ( ( extensions & VP8_PAYLOAD_DESC_EXT_T_BITMASK ) != 0 ||
+              ( extensions & VP8_PAYLOAD_DESC_EXT_K_BITMASK ) != 0 ) &&
+                isValid )
         {
-            pFrame->frameProperties |= VP8_FRAME_PROP_TL0PICIDX_PRESENT;
-
-            pFrame->tl0PicIndex = pPacket->pPacketData[ curIndex ];
-            curIndex += 1;
-        }
-
-        if( ( ( extensions & VP8_PAYLOAD_DESC_EXT_T_BITMASK ) != 0 ) ||
-            ( ( extensions & VP8_PAYLOAD_DESC_EXT_K_BITMASK ) != 0 ) )
-        {
-            if( ( extensions & VP8_PAYLOAD_DESC_EXT_T_BITMASK ) != 0 )
+            if( curIndex >= pPacket->packetDataLength )
             {
-                pFrame->frameProperties |= VP8_FRAME_PROP_TID_PRESENT;
-
-                pFrame->tid = ( pPacket->pPacketData[ curIndex ] &
-                                VP8_PAYLOAD_DESC_EXT_TID_BITMASK ) >>
-                              VP8_PAYLOAD_DESC_EXT_TID_LOCATION;
+                isValid = 0;
             }
-
-            if( ( extensions & VP8_PAYLOAD_DESC_EXT_K_BITMASK ) != 0 )
+            else
             {
-                pFrame->frameProperties |= VP8_FRAME_PROP_KEYIDX_PRESENT;
+                if( ( extensions & VP8_PAYLOAD_DESC_EXT_T_BITMASK ) != 0 )
+                {
+                    pFrame->frameProperties |= VP8_FRAME_PROP_TID_PRESENT;
 
-                pFrame->keyIndex = ( pPacket->pPacketData[ curIndex ] &
-                                     VP8_PAYLOAD_DESC_EXT_KEYIDX_BITMASK ) >>
-                                   VP8_PAYLOAD_DESC_EXT_KEYIDX_LOCATION;
+                    pFrame->tid = ( pPacket->pPacketData[ curIndex ] &
+                                    VP8_PAYLOAD_DESC_EXT_TID_BITMASK ) >>
+                                  VP8_PAYLOAD_DESC_EXT_TID_LOCATION;
+                }
+
+                if( ( extensions & VP8_PAYLOAD_DESC_EXT_K_BITMASK ) != 0 )
+                {
+                    pFrame->frameProperties |= VP8_FRAME_PROP_KEYIDX_PRESENT;
+
+                    pFrame->keyIndex = ( pPacket->pPacketData[ curIndex ] &
+                                         VP8_PAYLOAD_DESC_EXT_KEYIDX_BITMASK ) >>
+                                       VP8_PAYLOAD_DESC_EXT_KEYIDX_LOCATION;
+                }
+
+                if( ( pPacket->pPacketData[ curIndex ] & VP8_PAYLOAD_DESC_EXT_Y_BITMASK ) != 0 )
+                {
+                    pFrame->frameProperties |= VP8_FRAME_PROP_DEPENDS_ON_BASE_ONLY;
+                }
+
+                curIndex += 1;
             }
-
-            if( ( pPacket->pPacketData[ curIndex ] & VP8_PAYLOAD_DESC_EXT_Y_BITMASK ) != 0 )
-            {
-                pFrame->frameProperties |= VP8_FRAME_PROP_DEPENDS_ON_BASE_ONLY;
-            }
-
-            curIndex += 1;
         }
     }
-    else
+    else if( isValid )
     {
         curIndex += 1;
     }
 
-    return curIndex;
+    return isValid ? curIndex : 0;
 }
 
 /*-----------------------------------------------------------*/
@@ -168,17 +211,12 @@ VP8Result_t VP8Depacketizer_GetFrame( VP8DepacketizerContext_t * pCtx,
     {
         pPacket = &( pCtx->pPacketsArray[ i ] );
 
-        if( ( pPacket->packetDataLength < 1 ) ||
-            ( pPacket->packetDataLength < 2 &&
-              ( pPacket->pPacketData[ VP8_PAYLOAD_DESC_HEADER_OFFSET ] & VP8_PAYLOAD_DESC_X_BITMASK ) != 0 ) )
-        {
-            result = VP8_MALFORMED_PACKET;
-        }
-        else
-        {
-            payloadDescLength = ReadPayloadDescriptor( pPacket, pFrame );
+        payloadDescLength = ReadPayloadDescriptor( pPacket, pFrame );
 
-            if( pPacket->packetDataLength > payloadDescLength )
+            /* ReadPayloadDescriptor should return at least 1 (mandatory VP8 header),
+             * 0 indicates malformed packet due to bounds violation during extension parsing */
+            if( payloadDescLength != 0 &&
+                pPacket->packetDataLength > payloadDescLength )
             {
                 if( ( pFrame->frameDataLength - curFrameDataIndex ) >= ( pPacket->packetDataLength - payloadDescLength ) )
                 {
