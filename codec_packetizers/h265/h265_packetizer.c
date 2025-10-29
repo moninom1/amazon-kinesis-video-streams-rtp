@@ -115,25 +115,36 @@ static H265Result_t PacketizeFragmentationUnitPacket( H265PacketizerContext_t * 
         pPacket->pPacketData[ FU_HEADER_OFFSET ] = fuHeader;
 
         /* Write NALU data. */
-        memcpy( ( void * ) &( pPacket->pPacketData[ FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE ] ),
-                ( const void * ) &( pNaluData[ pCtx->fuPacketizationState.naluDataIndex ] ),
-                naluDataLengthToSend );
-        pPacket->packetDataLength = naluDataLengthToSend + FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE;
-
-        pCtx->fuPacketizationState.naluDataIndex += naluDataLengthToSend;
-        pCtx->fuPacketizationState.remainingNaluLength -= naluDataLengthToSend;
-
-        if( pCtx->fuPacketizationState.remainingNaluLength == 0 )
+        if( ( pCtx->fuPacketizationState.naluDataIndex + naluDataLengthToSend ) > pCtx->pNaluArray[ pCtx->tailIndex ].naluDataLength )
         {
-            /* Reset state. */
-            memset( &( pCtx->fuPacketizationState ),
-                    0,
-                    sizeof( FuPacketizationState_t ) );
-            pCtx->currentlyProcessingPacket = H265_PACKET_NONE;
+            result = H265_RESULT_MALFORMED_PACKET;
+        }
+        else if( naluDataLengthToSend > 0 )
+        {
+            memcpy( ( void * ) &( pPacket->pPacketData[ FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE ] ),
+                    ( const void * ) &( pNaluData[ pCtx->fuPacketizationState.naluDataIndex ] ),
+                    naluDataLengthToSend );
+        }
+        
+        if( result == H265_RESULT_OK )
+        {
+            pPacket->packetDataLength = naluDataLengthToSend + FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE;
 
-            /* Move to the next NALU in the next call to H265Packetizer_GetPacket. */
-            pCtx->tailIndex += 1;
-            pCtx->naluCount -= 1;
+            pCtx->fuPacketizationState.naluDataIndex += naluDataLengthToSend;
+            pCtx->fuPacketizationState.remainingNaluLength -= naluDataLengthToSend;
+
+            if( pCtx->fuPacketizationState.remainingNaluLength == 0 )
+            {
+                /* Reset state. */
+                memset( &( pCtx->fuPacketizationState ),
+                        0,
+                        sizeof( FuPacketizationState_t ) );
+                pCtx->currentlyProcessingPacket = H265_PACKET_NONE;
+
+                /* Move to the next NALU in the next call to H265Packetizer_GetPacket. */
+                pCtx->tailIndex += 1;
+                pCtx->naluCount -= 1;
+            }
         }
     }
 
@@ -415,6 +426,24 @@ H265Result_t H265Packetizer_GetPacket( H265PacketizerContext_t * pCtx,
         if( pCtx->naluCount == 0 )
         {
             result = H265_RESULT_NO_MORE_PACKETS;
+        }
+    }
+
+    /* Validate tailIndex bounds */
+    if( result == H265_RESULT_OK )
+    {
+        if( pCtx->tailIndex >= pCtx->naluArrayLength )
+        {
+            result = H265_RESULT_OUT_OF_MEMORY;
+        }
+    }
+
+    /* Validate NALU data pointer */
+    if( result == H265_RESULT_OK )
+    {
+        if( pCtx->pNaluArray[ pCtx->tailIndex ].pNaluData == NULL )
+        {
+            result = H265_RESULT_BAD_PARAM;
         }
     }
 

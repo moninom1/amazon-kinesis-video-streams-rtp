@@ -41,14 +41,15 @@ G711Result_t G711Packetizer_GetPacket( G711PacketizerContext_t * pCtx,
         ( pPacket == NULL ) ||
         ( pPacket->pPacketData == NULL ) ||
         ( pPacket->packetDataLength == 0 ) ||
-        ( pCtx->frame.pFrameData == NULL ) )
+        ( pCtx->frame.pFrameData == NULL ) ||
+        ( pCtx->curFrameDataIndex >= pCtx->frame.frameDataLength ) )
     {
         result = G711_RESULT_BAD_PARAM;
     }
 
     if( result == G711_RESULT_OK )
     {
-        if( pCtx->curFrameDataIndex >= pCtx->frame.frameDataLength )
+        if( pCtx->curFrameDataIndex == pCtx->frame.frameDataLength )
         {
             result = G711_RESULT_NO_MORE_PACKETS;
         }
