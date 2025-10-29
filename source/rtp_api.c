@@ -456,12 +456,6 @@ RtpResult_t Rtp_DeSerialize( RtpContext_t * pCtx,
         }
     }
 
-    /* Clear output structure on error to prevent information disclosure */
-    if( result != RTP_RESULT_OK )
-    {
-        memset( pRtpPacket, 0, sizeof( RtpPacket_t ) );
-    }
-
     return result;
 }
 
