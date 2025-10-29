@@ -213,28 +213,27 @@ VP8Result_t VP8Depacketizer_GetFrame( VP8DepacketizerContext_t * pCtx,
 
         payloadDescLength = ReadPayloadDescriptor( pPacket, pFrame );
 
-            /* ReadPayloadDescriptor should return at least 1 (mandatory VP8 header),
-             * 0 indicates malformed packet due to bounds violation during extension parsing */
-            if( payloadDescLength != 0 &&
-                pPacket->packetDataLength > payloadDescLength )
+        /* ReadPayloadDescriptor should return at least 1 (mandatory VP8 header),
+         * 0 indicates malformed packet due to bounds violation during extension parsing */
+        if( payloadDescLength != 0 &&
+            pPacket->packetDataLength > payloadDescLength )
+        {
+            if( ( pFrame->frameDataLength - curFrameDataIndex ) >= ( pPacket->packetDataLength - payloadDescLength ) )
             {
-                if( ( pFrame->frameDataLength - curFrameDataIndex ) >= ( pPacket->packetDataLength - payloadDescLength ) )
-                {
-                    memcpy( ( void * ) &( pFrame->pFrameData[ curFrameDataIndex ] ),
-                            ( const void * ) &( pPacket->pPacketData[ payloadDescLength ] ),
-                            pPacket->packetDataLength - payloadDescLength );
+                memcpy( ( void * ) &( pFrame->pFrameData[ curFrameDataIndex ] ),
+                        ( const void * ) &( pPacket->pPacketData[ payloadDescLength ] ),
+                        pPacket->packetDataLength - payloadDescLength );
 
-                    curFrameDataIndex += ( pPacket->packetDataLength - payloadDescLength );
-                }
-                else
-                {
-                    result = VP8_RESULT_OUT_OF_MEMORY;
-                }
+                curFrameDataIndex += ( pPacket->packetDataLength - payloadDescLength );
             }
             else
             {
-                result = VP8_MALFORMED_PACKET;
+                result = VP8_RESULT_OUT_OF_MEMORY;
             }
+        }
+        else
+        {
+            result = VP8_MALFORMED_PACKET;
         }
     }
 

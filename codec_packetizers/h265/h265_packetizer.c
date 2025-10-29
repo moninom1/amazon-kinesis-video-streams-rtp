@@ -125,7 +125,7 @@ static H265Result_t PacketizeFragmentationUnitPacket( H265PacketizerContext_t * 
                     ( const void * ) &( pNaluData[ pCtx->fuPacketizationState.naluDataIndex ] ),
                     naluDataLengthToSend );
         }
-        
+
         if( result == H265_RESULT_OK )
         {
             pPacket->packetDataLength = naluDataLengthToSend + FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE;

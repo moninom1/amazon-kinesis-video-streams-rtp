@@ -43,13 +43,21 @@ RtpPacketQueueResult_t RtpPacketQueue_Init( RtpPacketQueue_t * pQueue,
         pQueue->pRtpPacketInfoArray = pRtpPacketInfoArray;
         pQueue->rtpPacketInfoArrayLength = rtpPacketInfoArrayLength;
 
-        memset( pQueue->pRtpPacketInfoArray,
-                0,
-                sizeof( RtpPacketInfo_t ) * pQueue->rtpPacketInfoArrayLength );
+        /* Check for overflow in memset size calculation */
+        if( ( SIZE_MAX / sizeof( RtpPacketInfo_t ) ) < pQueue->rtpPacketInfoArrayLength )
+        {
+            result = RTP_PACKET_QUEUE_RESULT_BAD_PARAM;
+        }
+        else
+        {
+            memset( pQueue->pRtpPacketInfoArray,
+                    0,
+                    sizeof( RtpPacketInfo_t ) * pQueue->rtpPacketInfoArrayLength );
 
-        pQueue->readIndex = 0;
-        pQueue->writeIndex = 0;
-        pQueue->packetCount = 0;
+            pQueue->readIndex = 0;
+            pQueue->writeIndex = 0;
+            pQueue->packetCount = 0;
+        }
     }
 
     return result;

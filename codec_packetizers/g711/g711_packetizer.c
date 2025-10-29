@@ -42,7 +42,7 @@ G711Result_t G711Packetizer_GetPacket( G711PacketizerContext_t * pCtx,
         ( pPacket->pPacketData == NULL ) ||
         ( pPacket->packetDataLength == 0 ) ||
         ( pCtx->frame.pFrameData == NULL ) ||
-        ( pCtx->curFrameDataIndex >= pCtx->frame.frameDataLength ) )
+        ( pCtx->curFrameDataIndex > pCtx->frame.frameDataLength ) )
     {
         result = G711_RESULT_BAD_PARAM;
     }
@@ -66,14 +66,6 @@ G711Result_t G711Packetizer_GetPacket( G711PacketizerContext_t * pCtx,
 
         pPacket->packetDataLength = frameDataLengthToSend;
         pCtx->curFrameDataIndex += frameDataLengthToSend;
-
-        /* Check for logic error - curFrameDataIndex should never exceed frameDataLength */
-        if( pCtx->curFrameDataIndex > pCtx->frame.frameDataLength )
-        {
-            pCtx->curFrameDataIndex = pCtx->frame.frameDataLength;
-            result = G711_RESULT_NO_MORE_PACKETS;
-        }
-
     }
 
     return result;
