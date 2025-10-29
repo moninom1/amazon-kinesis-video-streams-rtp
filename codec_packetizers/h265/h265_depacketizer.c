@@ -133,7 +133,8 @@ static H265Result_t DepacketizeAggregationPacket( H265DepacketizerContext_t * pC
     }
 
     /* Is there enough data left in the packet to read the next NALU size? */
-    if( ( pCtx->curPacketIndex + AP_NALU_LENGTH_FIELD_SIZE ) <= curPacketLength )
+    if( ( SIZE_MAX - AP_NALU_LENGTH_FIELD_SIZE ) >= pCtx->curPacketIndex &&
+        ( pCtx->curPacketIndex + AP_NALU_LENGTH_FIELD_SIZE ) <= curPacketLength )
     {
         /* Read NALU length. */
         naluLength = pCurPacketData[ pCtx->curPacketIndex ];
@@ -143,7 +144,8 @@ static H265Result_t DepacketizeAggregationPacket( H265DepacketizerContext_t * pC
         pCtx->curPacketIndex += AP_NALU_LENGTH_FIELD_SIZE;
 
         /* Is there enough data left in the packet to read the next NALU? */
-        if( ( pCtx->curPacketIndex + naluLength ) <= curPacketLength )
+        if( ( SIZE_MAX - naluLength ) >= pCtx->curPacketIndex &&
+            ( pCtx->curPacketIndex + naluLength ) <= curPacketLength )
         {
             /* Is there enough space in the output buffer? */
             if( naluLength <= pNalu->naluDataLength )
@@ -161,7 +163,14 @@ static H265Result_t DepacketizeAggregationPacket( H265DepacketizerContext_t * pC
             pNalu->naluDataLength = naluLength;
 
             /* Move to next Nalu in the next call to H265Depacketizer_GetNalu. */
-            pCtx->curPacketIndex += naluLength;
+            if( ( SIZE_MAX - pCtx->curPacketIndex ) >= naluLength )
+            {
+                pCtx->curPacketIndex += naluLength;
+            }
+            else
+            {
+                result = H265_RESULT_MALFORMED_PACKET;
+            }
         }
         else
         {
@@ -169,7 +178,14 @@ static H265Result_t DepacketizeAggregationPacket( H265DepacketizerContext_t * pC
 
             /* Still move the curPacketIndex so that we move to the next packet
              * at the end of this function. */
-            pCtx->curPacketIndex += naluLength;
+            if( ( SIZE_MAX - naluLength ) >= pCtx->curPacketIndex )
+            {
+                pCtx->curPacketIndex += naluLength;
+            }
+            else
+            {
+                pCtx->curPacketIndex = curPacketLength;
+            }
         }
     }
     else
@@ -226,14 +242,17 @@ H265Result_t H265Depacketizer_AddPacket( H265DepacketizerContext_t * pCtx,
     H265Result_t result = H265_RESULT_OK;
 
     if( ( pCtx == NULL ) ||
-        ( pPacket == NULL ) )
+        ( pPacket == NULL ) ||
+        ( pPacket->pPacketData == NULL ) ||
+        ( pPacket->packetDataLength == 0 ) )
     {
         result = H265_RESULT_BAD_PARAM;
     }
 
     if( result == H265_RESULT_OK )
     {
-        if( pCtx->packetCount >= pCtx->packetsArrayLength )
+        if( ( pCtx->packetCount >= pCtx->packetsArrayLength ) ||
+            ( pCtx->headIndex >= pCtx->packetsArrayLength ) )
         {
             result = H265_RESULT_OUT_OF_MEMORY;
         }
@@ -269,6 +288,17 @@ H265Result_t H265Depacketizer_GetNalu( H265DepacketizerContext_t * pCtx,
         if( pCtx->packetCount == 0 )
         {
             result = H265_RESULT_NO_MORE_NALUS;
+        }
+    }
+
+    if( result == H265_RESULT_OK )
+    {
+        if( ( pNalu->pNaluData == NULL ) ||
+            ( pCtx->tailIndex >= pCtx->packetsArrayLength ) ||
+            ( pCtx->pPacketsArray[ pCtx->tailIndex ].pPacketData == NULL ) ||
+            ( pCtx->pPacketsArray[ pCtx->tailIndex ].packetDataLength == 0 ) )
+        {
+            result = H265_RESULT_BAD_PARAM;
         }
     }
 
