@@ -88,20 +88,20 @@ static RtpResult_t CalculateSerializedPacketLength( const RtpPacket_t * pRtpPack
     {
         headerLength = RTP_HEADER_MIN_LENGTH +
                        ( pRtpPacket->header.csrcCount * sizeof( uint32_t ) );
-    }
 
-    if( ( pRtpPacket->header.flags & RTP_HEADER_FLAG_EXTENSION ) != 0 )
-    {
-        size_t extensionSize = ( pRtpPacket->header.extension.extensionPayloadLength * sizeof( uint32_t ) );
+        if( ( pRtpPacket->header.flags & RTP_HEADER_FLAG_EXTENSION ) != 0 )
+        {
+            size_t extensionSize = ( pRtpPacket->header.extension.extensionPayloadLength * sizeof( uint32_t ) );
 
-        /* Check for overflow in extension calculation */
-        if( ( SIZE_MAX - headerLength - 4 ) < extensionSize )
-        {
-            result = RTP_RESULT_MALFORMED_PACKET;
-        }
-        else
-        {
-            headerLength = headerLength + 4 + extensionSize;
+            /* Check for overflow in extension calculation */
+            if( ( SIZE_MAX - headerLength - 4 ) < extensionSize )
+            {
+                result = RTP_RESULT_MALFORMED_PACKET;
+            }
+            else
+            {
+                headerLength = headerLength + 4 + extensionSize;
+            }
         }
     }
 
