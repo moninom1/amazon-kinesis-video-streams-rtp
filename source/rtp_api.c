@@ -91,17 +91,7 @@ static RtpResult_t CalculateSerializedPacketLength( const RtpPacket_t * pRtpPack
 
         if( ( pRtpPacket->header.flags & RTP_HEADER_FLAG_EXTENSION ) != 0 )
         {
-            size_t extensionSize = ( pRtpPacket->header.extension.extensionPayloadLength * sizeof( uint32_t ) );
-
-            /* Check for overflow in extension calculation */
-            if( ( SIZE_MAX - headerLength - 4 ) < extensionSize )
-            {
-                result = RTP_RESULT_MALFORMED_PACKET;
-            }
-            else
-            {
-                headerLength = headerLength + 4 + extensionSize;
-            }
+            headerLength += 4 + ( pRtpPacket->header.extension.extensionPayloadLength * sizeof( uint32_t ) );
         }
     }
 
@@ -427,24 +417,17 @@ RtpResult_t Rtp_DeSerialize( RtpContext_t * pCtx,
                 /* From RFC3550, section 5.1: The last octet of the padding
                  * contains a count of how many padding octets should be
                  * ignored, including itself. */
-                if( pRtpPacket->payloadLength > 0 )
-                {
-                    numPaddingOctets = pRtpPacket->pPayload[ pRtpPacket->payloadLength - 1 ];
+                numPaddingOctets = pRtpPacket->pPayload[ pRtpPacket->payloadLength - 1 ];
 
-                    if( ( numPaddingOctets > 0 ) &&
-                        ( numPaddingOctets <= pRtpPacket->payloadLength ) )
-                    {
-                        pRtpPacket->payloadLength -= numPaddingOctets;
-                    }
-                    else
-                    {
-                        /* The number of padding octets must be > 0 and cannot be
-                         * larger than the payload length. */
-                        result = RTP_RESULT_MALFORMED_PACKET;
-                    }
+                if( ( numPaddingOctets > 0 ) &&
+                    ( numPaddingOctets <= pRtpPacket->payloadLength ) )
+                {
+                    pRtpPacket->payloadLength -= numPaddingOctets;
                 }
                 else
                 {
+                    /* The number of padding octets must be > 0 and cannot be
+                     * larger than the payload length. */
                     result = RTP_RESULT_MALFORMED_PACKET;
                 }
             }
