@@ -82,6 +82,23 @@ void test_RtpPacketQueue_Init_BadParams( void )
 /*-----------------------------------------------------------*/
 
 /**
+ * @brief Validate RtpPacketQueue_Init with array length causing overflow.
+ */
+void test_RtpPacketQueue_Init_ArrayLengthOverflow( void )
+{
+    RtpPacketQueueResult_t result;
+    RtpPacketQueue_t queue = { 0 };
+    RtpPacketInfo_t packetInfoArray[2];
+    size_t overflowLength = SIZE_MAX / sizeof( RtpPacketInfo_t ) + 1;
+
+    result = RtpPacketQueue_Init( &queue, packetInfoArray, overflowLength );
+
+    TEST_ASSERT_EQUAL( RTP_PACKET_QUEUE_RESULT_BAD_PARAM, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
  * @brief Validate Enqueue functionality in case of bad parameters.
  */
 void test_RtpPacketQueue_Enqueue_BadParams( void )
