@@ -1831,6 +1831,7 @@ void test_H264_Depacketizer_GetNalu_UnsupportedPacket( void )
     h264Packet.pPacketData = &( packetData[ 0 ] );
     h264Packet.packetDataLength = sizeof( packetData );
     ctx.pPacketsArray = &( h264Packet );
+    ctx.packetsArrayLength = 1;
     ctx.packetCount = 1;
     ctx.tailIndex = 0;
 
@@ -1861,6 +1862,7 @@ void test_H264_Depacketizer_GetNalu_PayloadOutOfMemory( void )
     h264Packet.pPacketData = &( packetData[ 0 ] );
     h264Packet.packetDataLength = sizeof( packetData );
     ctx.pPacketsArray = &( h264Packet );
+    ctx.packetsArrayLength = 1;
     ctx.packetCount = 1;
     ctx.tailIndex = 0;
 
@@ -1891,6 +1893,7 @@ void test_H264_Depacketizer_GetNalu_HeaderOutOfMemory( void )
     h264Packet.pPacketData = &( packetData[ 0 ] );
     h264Packet.packetDataLength = sizeof( packetData );
     ctx.pPacketsArray = &( h264Packet );
+    ctx.packetsArrayLength = 1;
     ctx.packetCount = 1;
     ctx.tailIndex = 0;
 
