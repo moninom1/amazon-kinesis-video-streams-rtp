@@ -596,6 +596,21 @@ void test_H264_Packetizer_GetPacket_BadParams( void )
 
     TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
                        result );
+
+    /* Test NULL pNaluData in array */
+    Nalu_t nalusArray[ 1 ] = { { NULL, 10 } };
+    ctx.pNaluArray = nalusArray;
+    ctx.naluArrayLength = 1;
+    ctx.naluCount = 1;
+    ctx.tailIndex = 0;
+    pkt.pPacketData = &( pktBuffer[ 0 ] );
+    pkt.packetDataLength = MAX_H264_PACKET_LENGTH;
+
+    result = H264Packetizer_GetPacket( &( ctx ),
+                                       &( pkt ) );
+
+    TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
+                       result );
 }
 
 /* ==============================  Test Cases for Depacketization ============================== */
@@ -1758,6 +1773,22 @@ void test_H264_Depacketizer_AddPacket_BadParams( void )
 
     TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
                        result );
+
+    pkt.pPacketData = NULL;
+    pkt.packetDataLength = sizeof( packetData1 );
+    result = H264Depacketizer_AddPacket( &( ctx ),
+                                         &( pkt ) );
+
+    TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
+                       result );
+
+    pkt.pPacketData = &( packetData1[ 0 ] );
+    pkt.packetDataLength = 0;
+    result = H264Depacketizer_AddPacket( &( ctx ),
+                                         &( pkt ) );
+
+    TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
+                       result );
 }
 
 /*-----------------------------------------------------------*/
@@ -1806,6 +1837,38 @@ void test_H264_Depacketizer_GetNalu_BadParams( void )
 
     result = H264Depacketizer_GetNalu( &( ctx ),
                                        NULL );
+
+    TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
+                       result );
+
+    nalu.pNaluData = NULL;
+    result = H264Depacketizer_GetNalu( &( ctx ),
+                                       &( nalu ) );
+
+    TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
+                       result );
+
+    /* Test NULL pPacketData */
+    H264Packet_t h264Packet = { NULL, 10 };
+    ctx.pPacketsArray = &h264Packet;
+    ctx.packetsArrayLength = 1;
+    ctx.packetCount = 1;
+    ctx.tailIndex = 0;
+    nalu.pNaluData = &( naluBuffer[ 0 ] );
+
+    result = H264Depacketizer_GetNalu( &( ctx ),
+                                       &( nalu ) );
+
+    TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
+                       result );
+
+    /* Test invalid tailIndex */
+    ctx.tailIndex = 1;
+    ctx.packetCount = 1;
+    nalu.pNaluData = &( naluBuffer[ 0 ] );
+
+    result = H264Depacketizer_GetNalu( &( ctx ),
+                                       &( nalu ) );
 
     TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
                        result );
@@ -2028,6 +2091,75 @@ void test_H264_Depacketizer_GetFrame_OutOfMemory( void )
                                         &( frame ) );
 
     TEST_ASSERT_EQUAL( H264_RESULT_OUT_OF_MEMORY,
+                       result );
+}
+
+/*-----------------------------------------------------------*/
+/**
+ * @brief Test H264Depacketizer_GetNalu with NULL pNaluData
+ */
+void test_H264_Depacketizer_GetNalu_NullNaluData( void )
+{
+    H264Result_t result;
+    H264DepacketizerContext_t ctx = { 0 };
+    Nalu_t nalu;
+    H264Packet_t packetsArray[ MAX_PACKETS_IN_A_FRAME ];
+    uint8_t packetData[] = { 0x09, 0x10 };
+    H264Packet_t pkt = {
+        .pPacketData = packetData,
+        .packetDataLength = sizeof( packetData )
+    };
+
+    result = H264Depacketizer_Init( &( ctx ),
+                                    packetsArray,
+                                    MAX_PACKETS_IN_A_FRAME );
+    TEST_ASSERT_EQUAL( H264_RESULT_OK,
+                       result );
+
+    result = H264Depacketizer_AddPacket( &( ctx ),
+                                         &( pkt ) );
+    TEST_ASSERT_EQUAL( H264_RESULT_OK,
+                       result );
+
+    nalu.pNaluData = NULL;
+    nalu.naluDataLength = 100;
+
+    result = H264Depacketizer_GetNalu( &( ctx ),
+                                       &( nalu ) );
+
+    TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
+                       result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test H264Depacketizer_GetNalu with invalid tailIndex
+ */
+void test_H264_Depacketizer_GetNalu_InvalidTailIndex( void )
+{
+    H264Result_t result;
+    H264DepacketizerContext_t ctx = { 0 };
+    Nalu_t nalu;
+    uint8_t naluBuffer[ 100 ];
+    H264Packet_t packetsArray[ MAX_PACKETS_IN_A_FRAME ];
+
+    result = H264Depacketizer_Init( &( ctx ),
+                                    packetsArray,
+                                    MAX_PACKETS_IN_A_FRAME );
+    TEST_ASSERT_EQUAL( H264_RESULT_OK,
+                       result );
+
+    nalu.pNaluData = naluBuffer;
+    nalu.naluDataLength = sizeof( naluBuffer );
+
+    ctx.packetCount = 1;
+    ctx.tailIndex = MAX_PACKETS_IN_A_FRAME;
+
+    result = H264Depacketizer_GetNalu( &( ctx ),
+                                       &( nalu ) );
+
+    TEST_ASSERT_EQUAL( H264_RESULT_BAD_PARAM,
                        result );
 }
 
