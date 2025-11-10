@@ -144,8 +144,7 @@ static H265Result_t DepacketizeAggregationPacket( H265DepacketizerContext_t * pC
         pCtx->curPacketIndex += AP_NALU_LENGTH_FIELD_SIZE;
 
         /* Is there enough data left in the packet to read the next NALU? */
-        if( ( SIZE_MAX - naluLength ) >= pCtx->curPacketIndex &&
-            ( pCtx->curPacketIndex + naluLength ) <= curPacketLength )
+        if( ( pCtx->curPacketIndex + naluLength ) <= curPacketLength )
         {
             /* Is there enough space in the output buffer? */
             if( naluLength <= pNalu->naluDataLength )
@@ -163,14 +162,7 @@ static H265Result_t DepacketizeAggregationPacket( H265DepacketizerContext_t * pC
             pNalu->naluDataLength = naluLength;
 
             /* Move to next Nalu in the next call to H265Depacketizer_GetNalu. */
-            if( ( SIZE_MAX - pCtx->curPacketIndex ) >= naluLength )
-            {
-                pCtx->curPacketIndex += naluLength;
-            }
-            else
-            {
-                result = H265_RESULT_MALFORMED_PACKET;
-            }
+            pCtx->curPacketIndex += naluLength;
         }
         else
         {
@@ -178,14 +170,7 @@ static H265Result_t DepacketizeAggregationPacket( H265DepacketizerContext_t * pC
 
             /* Still move the curPacketIndex so that we move to the next packet
              * at the end of this function. */
-            if( ( SIZE_MAX - naluLength ) >= pCtx->curPacketIndex )
-            {
-                pCtx->curPacketIndex += naluLength;
-            }
-            else
-            {
-                pCtx->curPacketIndex = curPacketLength;
-            }
+            pCtx->curPacketIndex += naluLength;
         }
     }
     else

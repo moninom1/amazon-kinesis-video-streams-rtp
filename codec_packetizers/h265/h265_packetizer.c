@@ -12,9 +12,9 @@ static void PacketizeSingleNaluPacket( H265PacketizerContext_t * pCtx,
 static H265Result_t PacketizeFragmentationUnitPacket( H265PacketizerContext_t * pCtx,
                                                       H265Packet_t * pPacket );
 
-static H265Result_t PacketizeAggregationPacket( H265PacketizerContext_t * pCtx,
-                                                size_t nalusToAggregate,
-                                                H265Packet_t * pPacket );
+static void PacketizeAggregationPacket( H265PacketizerContext_t * pCtx,
+                                        size_t nalusToAggregate,
+                                        H265Packet_t * pPacket );
 
 /*-----------------------------------------------------------*/
 
@@ -119,7 +119,7 @@ static H265Result_t PacketizeFragmentationUnitPacket( H265PacketizerContext_t * 
         {
             result = H265_RESULT_MALFORMED_PACKET;
         }
-        else if( naluDataLengthToSend > 0 )
+        else
         {
             memcpy( ( void * ) &( pPacket->pPacketData[ FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE ] ),
                     ( const void * ) &( pNaluData[ pCtx->fuPacketizationState.naluDataIndex ] ),
@@ -153,11 +153,10 @@ static H265Result_t PacketizeFragmentationUnitPacket( H265PacketizerContext_t * 
 
 /*-----------------------------------------------------------*/
 
-static H265Result_t PacketizeAggregationPacket( H265PacketizerContext_t * pCtx,
-                                                size_t nalusToAggregate,
-                                                H265Packet_t * pPacket )
+static void PacketizeAggregationPacket( H265PacketizerContext_t * pCtx,
+                                        size_t nalusToAggregate,
+                                        H265Packet_t * pPacket )
 {
-    H265Result_t result = H265_RESULT_OK;
     size_t i, packetWriteIndex = 0, naluSize;
     uint8_t * pNaluData;
     uint8_t temporalId, minTemporalId = 0xFF;
@@ -170,29 +169,11 @@ static H265Result_t PacketizeAggregationPacket( H265PacketizerContext_t * pCtx,
     /* Aggregate all the NAL units in the packet. */
     for( i = 0; i < nalusToAggregate; i++ )
     {
-        if( ( pCtx->tailIndex + i ) >= pCtx->naluArrayLength )
-        {
-            result = H265_RESULT_OUT_OF_MEMORY;
-            break;
-        }
         pNaluData = pCtx->pNaluArray[ pCtx->tailIndex + i ].pNaluData;
         naluSize = pCtx->pNaluArray[ pCtx->tailIndex + i ].naluDataLength;
 
-        if( ( pNaluData == NULL ) || ( naluSize < NALU_HEADER_SIZE ) )
-        {
-            result = H265_RESULT_BAD_PARAM;
-            break;
-        }
-
         temporalId = ( pNaluData[ 1 ] & NALU_HEADER_TID_MASK ) >> NALU_HEADER_TID_LOCATION;
         minTemporalId = H265_MIN( minTemporalId, temporalId );
-
-        /* Check if we have enough space in the packet buffer. */
-        if( ( packetWriteIndex + 2 + naluSize ) > pPacket->packetDataLength )
-        {
-            result = H265_RESULT_OUT_OF_MEMORY;
-            break;
-        }
 
         /* Update F bit in the payload header. */
         pPacket->pPacketData[ 0 ] |= ( pNaluData[ 0 ] & NALU_HEADER_F_MASK );
@@ -209,22 +190,14 @@ static H265Result_t PacketizeAggregationPacket( H265PacketizerContext_t * pCtx,
         packetWriteIndex += naluSize;
     }
 
-    if( result == H265_RESULT_OK )
-    {
-        /* Write TID in the payload header. */
-        pPacket->pPacketData[ 1 ] |= ( minTemporalId << NALU_HEADER_TID_LOCATION );
+    /* Write TID in the payload header. */
+    pPacket->pPacketData[ 1 ] |= ( minTemporalId << NALU_HEADER_TID_LOCATION );
 
-        /* Update context state with bounds checking. */
-        if( nalusToAggregate <= pCtx->naluCount )
-        {
-            pCtx->tailIndex += nalusToAggregate;
-            pCtx->naluCount -= nalusToAggregate;
-        }
+    /* Update context state. */
+    pCtx->tailIndex += nalusToAggregate;
+    pCtx->naluCount -= nalusToAggregate;
 
-        pPacket->packetDataLength = packetWriteIndex;
-    }
-
-    return result;
+    pPacket->packetDataLength = packetWriteIndex;
 }
 
 /*-----------------------------------------------------------*/
@@ -494,17 +467,20 @@ H265Result_t H265Packetizer_GetPacket( H265PacketizerContext_t * pCtx,
                 }
 
                 /* If we can aggregate more than one NAL units, use Aggregation Packet. */
-                if( nalusToAggregate > 1 )
+                if( result == H265_RESULT_OK )
                 {
-                    result = PacketizeAggregationPacket( pCtx,
-                                                         nalusToAggregate,
-                                                         pPacket );
-                }
-                else
-                {
-                    /* Otherwise, use Single NAL Unit Packet. */
-                    PacketizeSingleNaluPacket( pCtx,
-                                               pPacket );
+                    if( nalusToAggregate > 1 )
+                    {
+                        PacketizeAggregationPacket( pCtx,
+                                                   nalusToAggregate,
+                                                   pPacket );
+                    }
+                    else
+                    {
+                        /* Otherwise, use Single NAL Unit Packet. */
+                        PacketizeSingleNaluPacket( pCtx,
+                                                pPacket );
+                    }
                 }
             }
             else
