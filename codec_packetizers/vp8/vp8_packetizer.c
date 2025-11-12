@@ -146,8 +146,7 @@ VP8Result_t VP8Packetizer_GetPacket( VP8PacketizerContext_t * pCtx,
 
     if( result == VP8_RESULT_OK )
     {
-        if( ( pPacket->packetDataLength > pCtx->payloadDescLength ) &&
-            ( pCtx->frameDataLength > pCtx->curFrameDataIndex ) )
+        if( pPacket->packetDataLength > pCtx->payloadDescLength )
         {
             memcpy( ( void * ) &( pPacket->pPacketData[ 0 ] ),
                     ( const void * ) &( pCtx->payloadDesc[ 0 ] ),

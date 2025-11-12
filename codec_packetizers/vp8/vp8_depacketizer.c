@@ -40,8 +40,7 @@ static size_t ReadPayloadDescriptor( const VP8Packet_t * pPacket,
         /* Location to read the next extension. */
         curIndex += 2;
 
-        if( ( extensions & VP8_PAYLOAD_DESC_EXT_I_BITMASK ) != 0 &&
-              isValid )
+        if( ( extensions & VP8_PAYLOAD_DESC_EXT_I_BITMASK ) != 0 )
         {
             if( curIndex >= pPacket->packetDataLength )
             {
