@@ -164,6 +164,15 @@ void test_Opus_Packetizer_GetPacket_BadParams( void )
     TEST_ASSERT_EQUAL( OPUS_RESULT_BAD_PARAM,
                        result );
 
+    pkt.pPacketData = NULL;
+    pkt.packetDataLength = PACKET_BUFFER_LENGTH;
+
+    result = OpusPacketizer_GetPacket( &( ctx ),
+                                       &( pkt ) );
+
+    TEST_ASSERT_EQUAL( OPUS_RESULT_BAD_PARAM,
+                       result );
+
     pkt.pPacketData = &( packetBuffer[ 0 ] );
     pkt.packetDataLength = 0;
 

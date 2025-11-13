@@ -688,6 +688,24 @@ void test_VP8_Packetizer_GetPacket_BadParams( void )
 
     TEST_ASSERT_EQUAL( VP8_RESULT_BAD_PARAM,
                        result );
+
+    pkt.pPacketData = NULL;
+    pkt.packetDataLength = PACKET_BUFFER_LENGTH;
+
+    result = VP8Packetizer_GetPacket( &( ctx ),
+                                      &( pkt ) );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_BAD_PARAM,
+                       result );
+
+    pkt.pPacketData = &( packetBuffer[ 0 ] );
+    pkt.packetDataLength = 0;
+
+    result = VP8Packetizer_GetPacket( &( ctx ),
+                                      &( pkt ) );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_BAD_PARAM,
+                       result );
 }
 
 /*-----------------------------------------------------------*/
@@ -1686,12 +1704,12 @@ void test_VP8_Depacketizer_GetFrame_MalformedPacket( void )
     TEST_ASSERT_EQUAL( VP8_MALFORMED_PACKET,
                        result );
 }
+
 /*-----------------------------------------------------------*/
 
 /**
  * @brief Validate VP8_Depacketizer_GetPacketProperties incase of bad parameters.
  */
-
 void test_VP8_Depacketizer_GetPacketProperties_BadParams( void )
 {
     VP8Result_t result;
@@ -1732,3 +1750,246 @@ void test_VP8_Depacketizer_GetPacketProperties_BadParams( void )
 }
 
 /*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate VP8_Depacketizer_GetFrame with packet having X bit but missing extension byte.
+ */
+void test_VP8_Depacketizer_GetFrame_XBitSet_MissingExtension( void )
+{
+    VP8DepacketizerContext_t ctx;
+    VP8Result_t result;
+    VP8Packet_t pkt;
+    VP8Frame_t frame;
+    uint8_t packetData[] = { 0x80 };
+
+    result = VP8Depacketizer_Init( &( ctx ),
+                                   &( packetsArray[ 0 ] ),
+                                   VP8_PACKETS_ARR_LEN );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK,
+                       result );
+
+    pkt.pPacketData = &( packetData[ 0 ] );
+    pkt.packetDataLength = sizeof( packetData );
+
+    result = VP8Depacketizer_AddPacket( &( ctx ),
+                                        &( pkt ) );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK,
+                       result );
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = VP8_FRAME_BUF_LEN;
+
+    result = VP8Depacketizer_GetFrame( &( ctx ),
+                                       &( frame ) );
+
+    TEST_ASSERT_EQUAL( VP8_MALFORMED_PACKET,
+                       result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate VP8_Depacketizer_GetFrame with 15-bit picture ID but insufficient data.
+ */
+void test_VP8_Depacketizer_GetFrame_PictureID_15Bit_Incomplete( void )
+{
+    VP8DepacketizerContext_t ctx;
+    VP8Result_t result;
+    VP8Packet_t pkt;
+    VP8Frame_t frame;
+    uint8_t packetData[] = { 0x80, 0x80, 0x80 };
+
+    result = VP8Depacketizer_Init( &( ctx ),
+                                   &( packetsArray[ 0 ] ),
+                                   VP8_PACKETS_ARR_LEN );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    pkt.pPacketData = &( packetData[ 0 ] );
+    pkt.packetDataLength = sizeof( packetData );
+
+    result = VP8Depacketizer_AddPacket( &( ctx ), &( pkt ) );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = VP8_FRAME_BUF_LEN;
+
+    result = VP8Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( VP8_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate VP8_Depacketizer_GetFrame with TL0PICIDX extension but insufficient data.
+ */
+void test_VP8_Depacketizer_GetFrame_TL0PICIDX_Incomplete( void )
+{
+    VP8DepacketizerContext_t ctx;
+    VP8Result_t result;
+    VP8Packet_t pkt;
+    VP8Frame_t frame;
+    uint8_t packetData[] = { 0x80, 0x40 };
+
+    result = VP8Depacketizer_Init( &( ctx ),
+                                   &( packetsArray[ 0 ] ),
+                                   VP8_PACKETS_ARR_LEN );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    pkt.pPacketData = &( packetData[ 0 ] );
+    pkt.packetDataLength = sizeof( packetData );
+
+    result = VP8Depacketizer_AddPacket( &( ctx ), &( pkt ) );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = VP8_FRAME_BUF_LEN;
+
+    result = VP8Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( VP8_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate VP8_Depacketizer_GetFrame with TID/KEYIDX extension but insufficient data.
+ */
+void test_VP8_Depacketizer_GetFrame_TID_KEYIDX_Incomplete( void )
+{
+    VP8DepacketizerContext_t ctx;
+    VP8Result_t result;
+    VP8Packet_t pkt;
+    VP8Frame_t frame;
+    uint8_t packetData[] = { 0x80, 0x30 };
+
+    result = VP8Depacketizer_Init( &( ctx ),
+                                   &( packetsArray[ 0 ] ),
+                                   VP8_PACKETS_ARR_LEN );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    pkt.pPacketData = &( packetData[ 0 ] );
+    pkt.packetDataLength = sizeof( packetData );
+
+    result = VP8Depacketizer_AddPacket( &( ctx ), &( pkt ) );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = VP8_FRAME_BUF_LEN;
+
+    result = VP8Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( VP8_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate VP8_Depacketizer_GetFrame with picture ID extension but insufficient data.
+ */
+void test_VP8_Depacketizer_GetFrame_PictureID_Incomplete( void )
+{
+    VP8DepacketizerContext_t ctx;
+    VP8Result_t result;
+    VP8Packet_t pkt;
+    VP8Frame_t frame;
+    uint8_t packetData[] = { 0x80, 0x80 };
+
+    result = VP8Depacketizer_Init( &( ctx ),
+                                   &( packetsArray[ 0 ] ),
+                                   VP8_PACKETS_ARR_LEN );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    pkt.pPacketData = &( packetData[ 0 ] );
+    pkt.packetDataLength = sizeof( packetData );
+
+    result = VP8Depacketizer_AddPacket( &( ctx ), &( pkt ) );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = VP8_FRAME_BUF_LEN;
+
+    result = VP8Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( VP8_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate VP8_Depacketizer_GetFrame with zero-length packet.
+ */
+void test_VP8_Depacketizer_GetFrame_ZeroLengthPacket( void )
+{
+    VP8DepacketizerContext_t ctx;
+    VP8Result_t result;
+    VP8Frame_t frame;
+    uint8_t packetData[] = { 0x10 };
+
+    result = VP8Depacketizer_Init( &( ctx ),
+                                   &( packetsArray[ 0 ] ),
+                                   VP8_PACKETS_ARR_LEN );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    ctx.pPacketsArray[ 0 ].pPacketData = &( packetData[ 0 ] );
+    ctx.pPacketsArray[ 0 ].packetDataLength = 0;
+    ctx.packetCount = 1;
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = VP8_FRAME_BUF_LEN;
+
+    result = VP8Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( VP8_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate VP8_Depacketizer_GetFrame with 1-byte packet without X bit.
+ */
+void test_VP8_Depacketizer_GetFrame_OneByte_NoXBit( void )
+{
+    VP8DepacketizerContext_t ctx;
+    VP8Result_t result;
+    VP8Packet_t pkt;
+    VP8Frame_t frame;
+    uint8_t packetData[] = { 0x00 };
+
+    result = VP8Depacketizer_Init( &( ctx ),
+                                   &( packetsArray[ 0 ] ),
+                                   VP8_PACKETS_ARR_LEN );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    pkt.pPacketData = &( packetData[ 0 ] );
+    pkt.packetDataLength = sizeof( packetData );
+
+    result = VP8Depacketizer_AddPacket( &( ctx ), &( pkt ) );
+
+    TEST_ASSERT_EQUAL( VP8_RESULT_OK, result );
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = VP8_FRAME_BUF_LEN;
+
+    result = VP8Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( VP8_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate VP8_Depacketizer_GetFrame with payload descriptor length equal to packet length.
+ */

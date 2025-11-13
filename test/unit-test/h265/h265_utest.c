@@ -902,7 +902,7 @@ void test_H265_Packetizer_GetPacket_One_Aggregate_And_One_Single_Nalu_Packet( vo
                                    packet.packetDataLength );
 
     /* Should get single NALU packet. */
-    packet.packetDataLength = 14;
+    packet.packetDataLength = MAX_H265_PACKET_LENGTH;
     result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
     TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
     TEST_ASSERT_EQUAL( sizeof( naluData3 ), packet.packetDataLength );
@@ -953,6 +953,172 @@ void test_H265_Packetizer_GetPacket_BadParams( void )
     result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
 
     TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test H265 packetization GetPacket with corrupted state validation.
+ */
+void test_H265_Packetizer_GetPacket_Corrupted_State_Validation( void )
+{
+    H265PacketizerContext_t ctx;
+    H265Result_t result;
+    H265Nalu_t naluArray[ MAX_NALUS_IN_A_FRAME ];
+    uint8_t naluData[] = { 0x40, 0x01, 0xAA, 0xBB };
+    H265Nalu_t nalu = { .pNaluData = &( naluData[ 0 ] ), .naluDataLength = sizeof( naluData ) };
+    H265Packet_t packet = { .pPacketData = &( packetBuffer[ 0 ] ), .packetDataLength = MAX_H265_PACKET_LENGTH };
+
+    result = H265Packetizer_Init( &( ctx ), &( naluArray[ 0 ] ), MAX_NALUS_IN_A_FRAME );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Packetizer_AddNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    /* Test tailIndex out of bounds */
+    ctx.tailIndex = MAX_NALUS_IN_A_FRAME;
+    result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OUT_OF_MEMORY, result );
+
+    /* Reset and test NULL NALU data */
+    ctx.tailIndex = 0;
+    ctx.pNaluArray[ ctx.tailIndex ].pNaluData = NULL;
+    result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
+
+    /* Reset and test zero NALU length */
+    ctx.pNaluArray[ ctx.tailIndex ].pNaluData = &( naluData[ 0 ] );
+    ctx.pNaluArray[ ctx.tailIndex ].naluDataLength = 0;
+    result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_MALFORMED_PACKET, result );
+}
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test H265 packetization GetPacket with aggregation loop index overflow.
+ */
+void test_H265_Packetizer_GetPacket_Aggregation_Loop_Index_Overflow( void )
+{
+    H265PacketizerContext_t ctx;
+    H265Result_t result;
+    H265Nalu_t naluArray[ 2 ];
+    uint8_t naluData[] = { 0x40, 0x01, 0xAA, 0xBB };
+    H265Nalu_t nalu = { .pNaluData = &( naluData[ 0 ] ), .naluDataLength = sizeof( naluData ) };
+    H265Packet_t packet = { .pPacketData = &( packetBuffer[ 0 ] ), .packetDataLength = MAX_H265_PACKET_LENGTH };
+
+    result = H265Packetizer_Init( &( ctx ), &( naluArray[ 0 ] ), 2 );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Packetizer_AddNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Packetizer_AddNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    /* Corrupt tailIndex to trigger overflow in aggregation loop */
+    ctx.tailIndex = 1;
+
+    result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OUT_OF_MEMORY, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test H265 packetization GetPacket when aggregation loop detects overflow.
+ */
+void test_H265_Packetizer_GetPacket_Aggregation_Detects_Overflow( void )
+{
+    H265PacketizerContext_t ctx;
+    H265Result_t result;
+    H265Nalu_t naluArray[ 3 ];
+    uint8_t naluData[] = { 0x40, 0x01, 0xAA, 0xBB };
+    H265Nalu_t nalu = { .pNaluData = &( naluData[ 0 ] ), .naluDataLength = sizeof( naluData ) };
+    H265Packet_t packet = { .pPacketData = &( packetBuffer[ 0 ] ), .packetDataLength = MAX_H265_PACKET_LENGTH };
+
+    result = H265Packetizer_Init( &( ctx ), &( naluArray[ 0 ] ), 3 );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Packetizer_AddNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Packetizer_AddNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Packetizer_AddNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    ctx.tailIndex = 2;
+    ctx.naluCount = 2;
+
+    result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OUT_OF_MEMORY, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test H265 packetization GetPacket with corrupted FU state causing index overflow.
+ */
+void test_H265_Packetizer_GetPacket_Fragmentation_Corrupted_State_Index_Overflow( void )
+{
+    H265PacketizerContext_t ctx;
+    H265Result_t result;
+    H265Nalu_t naluArray[ MAX_NALUS_IN_A_FRAME ];
+    uint8_t naluData[ 10 ] =
+    {
+        0x40, 0x01,
+        0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22
+    };
+    H265Nalu_t nalu =
+    {
+        .pNaluData = &( naluData[ 0 ] ),
+        .naluDataLength = sizeof( naluData )
+    };
+    H265Packet_t packet =
+    {
+        .pPacketData = &( packetBuffer[ 0 ] ),
+        .packetDataLength = 6
+    };
+
+    result = H265Packetizer_Init( &( ctx ), &( naluArray[ 0 ] ), MAX_NALUS_IN_A_FRAME );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Packetizer_AddNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    /* Corrupt the FU state to trigger overflow check */
+    ctx.fuPacketizationState.naluDataIndex = sizeof( naluData ) + 1;
+
+    packet.packetDataLength = 6;
+    result = H265Packetizer_GetPacket( &( ctx ), &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test H265 packetization AddNalu with corrupted headIndex.
+ */
+void test_H265_Packetizer_AddNalu_Corrupted_HeadIndex( void )
+{
+    H265PacketizerContext_t ctx;
+    H265Result_t result;
+    H265Nalu_t naluArray[ 2 ];
+    uint8_t naluData[] = { 0x40, 0x01, 0xAA, 0xBB };
+    H265Nalu_t nalu = { .pNaluData = &( naluData[ 0 ] ), .naluDataLength = sizeof( naluData ) };
+
+    result = H265Packetizer_Init( &( ctx ), &( naluArray[ 0 ] ), 2 );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    /* Corrupt headIndex to exceed array length */
+    ctx.headIndex = 2;
+
+    result = H265Packetizer_AddNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OUT_OF_MEMORY, result );
 }
 
 /*-----------------------------------------------------------*/
@@ -1122,13 +1288,41 @@ void test_H265_Depacketizer_GetNalu_BadParams( void )
     H265DepacketizerContext_t ctx;
     H265Nalu_t nalu;
     H265Result_t result;
+    H265Packet_t packetsArray[ 1 ];
+    uint8_t naluBuffer[ 10 ];
 
     result = H265Depacketizer_GetNalu( NULL, &( nalu ) );
-
     TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
 
     result = H265Depacketizer_GetNalu( &( ctx ), NULL );
+    TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
 
+    /* Test NULL NALU data */
+    H265Depacketizer_Init( &( ctx ), &( packetsArray[ 0 ] ), 1 );
+    nalu.pNaluData = NULL;
+    nalu.naluDataLength = 10;
+    ctx.packetCount = 1;
+    result = H265Depacketizer_GetNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
+
+    /* Test tail index out of bounds */
+    nalu.pNaluData = &( naluBuffer[ 0 ] );
+    ctx.tailIndex = 1;
+    result = H265Depacketizer_GetNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
+
+    /* Test NULL packet data in array */
+    ctx.tailIndex = 0;
+    packetsArray[ 0 ].pPacketData = NULL;
+    packetsArray[ 0 ].packetDataLength = 10;
+    result = H265Depacketizer_GetNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
+
+    /* Test zero packet data length in array */
+    uint8_t packetData[] = { 0x01, 0x02 };
+    packetsArray[ 0 ].pPacketData = &( packetData[ 0 ] );
+    packetsArray[ 0 ].packetDataLength = 0;
+    result = H265Depacketizer_GetNalu( &( ctx ), &( nalu ) );
     TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
 }
 
@@ -1958,13 +2152,26 @@ void test_H265Depacketizer_AddPacket_BadParams( void )
     H265DepacketizerContext_t ctx;
     H265Packet_t packet;
     H265Result_t result;
+    H265Packet_t packetsArray[ 1 ];
 
     result = H265Depacketizer_AddPacket( &( ctx ), NULL );
-
     TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
 
     result = H265Depacketizer_AddPacket( NULL, &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
 
+    /* Test NULL packet data */
+    H265Depacketizer_Init( &( ctx ), &( packetsArray[ 0 ] ), 1 );
+    packet.pPacketData = NULL;
+    packet.packetDataLength = 10;
+    result = H265Depacketizer_AddPacket( &( ctx ), &( packet ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
+
+    /* Test zero packet data length */
+    uint8_t packetData[] = { 0x01, 0x02 };
+    packet.pPacketData = &( packetData[ 0 ] );
+    packet.packetDataLength = 0;
+    result = H265Depacketizer_AddPacket( &( ctx ), &( packet ) );
     TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
 }
 
@@ -2004,6 +2211,33 @@ void test_H265Depacketizer_AddPacket_OutOfMemory( void )
 
     result = H265Depacketizer_AddPacket( &( ctx ), &( packet ) );
 
+    TEST_ASSERT_EQUAL( H265_RESULT_OUT_OF_MEMORY, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test H265 depacketization AddPacket with headIndex overflow.
+ */
+void test_H265Depacketizer_AddPacket_HeadIndex_Overflow( void )
+{
+    H265DepacketizerContext_t ctx;
+    H265Result_t result;
+    H265Packet_t packetsArray[ 2 ];
+    uint8_t packetData[] = { 0x01, 0x02, 0x03, 0x04 };
+    H265Packet_t packet =
+    {
+        .pPacketData = &( packetData[ 0 ] ),
+        .packetDataLength = sizeof( packetData )
+    };
+
+    result = H265Depacketizer_Init( &( ctx ), &( packetsArray[ 0 ] ), 2 );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    /* Manually set headIndex to trigger overflow */
+    ctx.headIndex = 2;
+
+    result = H265Depacketizer_AddPacket( &( ctx ), &( packet ) );
     TEST_ASSERT_EQUAL( H265_RESULT_OUT_OF_MEMORY, result );
 }
 
@@ -2192,6 +2426,92 @@ void test_H265_Depacketizer_GetPacketProperties_Unsupported_Packet( void )
 /*-----------------------------------------------------------*/
 
 /**
+ * @brief Test H265 depacketization of aggregation packet with overflow.
+ */
+void test_H265Depacketizer_GetNalu_Aggregation_Packet_Overflow( void )
+{
+    H265DepacketizerContext_t ctx;
+    H265Result_t result;
+    H265Packet_t packetsArray[ 10 ];
+    H265Nalu_t nalu =
+    {
+        .pNaluData = &( frameBuffer[ 0 ] ),
+        .naluDataLength = MAX_FRAME_LENGTH
+    };
+    uint8_t aggregationPacketData[] =
+    {
+        0x60, 0x01, /* Payload header: Type=48, TID=1. */
+        0x00, 0x04, /* NALU1 Size. */
+        0x40, 0x01, 0xAA, 0xBB, /* NALU1 payload. */
+    };
+    H265Packet_t aggregationPacket =
+    {
+        .pPacketData = &( aggregationPacketData[ 0 ] ),
+        .packetDataLength = sizeof( aggregationPacketData )
+    };
+
+    result = H265Depacketizer_Init( &( ctx ), &( packetsArray[ 0 ] ), 10 );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Depacketizer_AddPacket( &( ctx ), &( aggregationPacket ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    /* Set curPacketIndex to SIZE_MAX - 1 to trigger overflow check */
+    ctx.curPacketIndex = SIZE_MAX - 1;
+
+    result = H265Depacketizer_GetNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test H265 depacketization of aggregation packet with insufficient data.
+ */
+void test_H265Depacketizer_GetNalu_Aggregation_Packet_Insufficient_Data( void )
+{
+    H265DepacketizerContext_t ctx;
+    H265Result_t result;
+    H265Packet_t packetsArray[ 10 ];
+    H265Nalu_t nalu =
+    {
+        .pNaluData = &( frameBuffer[ 0 ] ),
+        .naluDataLength = MAX_FRAME_LENGTH
+    };
+    uint8_t aggregationPacketData[] =
+    {
+        0x60, 0x01, /* Payload header: Type=48, TID=1. */
+        0x00, 0x04, /* NALU1 Size. */
+        0x40, 0x01, 0xAA, 0xBB, /* NALU1 payload. */
+    };
+    H265Packet_t aggregationPacket =
+    {
+        .pPacketData = &( aggregationPacketData[ 0 ] ),
+        .packetDataLength = sizeof( aggregationPacketData )
+    };
+
+    result = H265Depacketizer_Init( &( ctx ), &( packetsArray[ 0 ] ), 10 );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    result = H265Depacketizer_AddPacket( &( ctx ), &( aggregationPacket ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    /* Get first NALU successfully */
+    result = H265Depacketizer_GetNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_OK, result );
+
+    /* Set curPacketIndex near end to trigger insufficient data check */
+    ctx.curPacketIndex = sizeof( aggregationPacketData ) - 1;
+    ctx.tailIndex = 0;
+    ctx.packetCount = 1;
+
+    result = H265Depacketizer_GetNalu( &( ctx ), &( nalu ) );
+    TEST_ASSERT_EQUAL( H265_RESULT_MALFORMED_PACKET, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
  * @brief Test H265 depacketization GetPacketProperties for bad params.
  */
 void test_H265_Depacketizer_GetPacketProperties_BadParams( void )
@@ -2228,5 +2548,6 @@ void test_H265_Depacketizer_GetPacketProperties_BadParams( void )
 
     TEST_ASSERT_EQUAL( H265_RESULT_BAD_PARAM, result );
 }
+
 
 /*-----------------------------------------------------------*/

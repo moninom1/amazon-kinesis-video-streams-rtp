@@ -118,6 +118,8 @@ OpusResult_t OpusDepacketizer_GetPacketProperties( const uint8_t * pPacketData,
 {
     OpusResult_t result = OPUS_RESULT_OK;
 
+    ( void ) packetDataLength;
+
     if( ( pPacketData == NULL ) ||
         ( pProperties == NULL ) ||
         ( packetDataLength == 0 ) )

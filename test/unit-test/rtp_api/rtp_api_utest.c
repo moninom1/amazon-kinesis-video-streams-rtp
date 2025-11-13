@@ -5,6 +5,7 @@
 /* Standard includes. */
 #include <string.h>
 #include <stdint.h>
+#include <stddef.h>
 
 /* API includes. */
 #include "rtp_api.h"
@@ -544,6 +545,84 @@ void test_Rtp_Serialize_Pass_ZeroPayloadLength( void )
     TEST_ASSERT_EQUAL_UINT8_ARRAY( &( expectedSerializedPacket[ 0 ] ),
                                    pRtpBuffer,
                                    rtpBufferLength );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate Rtp_Serialize with invalid CSRC count > 15.
+ */
+void test_Rtp_Serialize_InvalidCsrcCount( void )
+{
+    RtpResult_t result;
+    RtpContext_t ctx = { 0 };
+    RtpPacket_t packet = { 0 };
+    size_t rtpBufferLength = RTP_BUFFER_LENGTH;
+
+    Rtp_Init( &( ctx ) );
+
+    packet.header.csrcCount = 16; /* Invalid: exceeds maximum of 15 */
+
+    result = Rtp_Serialize( &( ctx ),
+                            &( packet ),
+                            pRtpBuffer,
+                            &( rtpBufferLength ) );
+
+    TEST_ASSERT_EQUAL( RTP_RESULT_MALFORMED_PACKET,
+                       result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate Rtp_Serialize with payload length causing overflow.
+ */
+void test_Rtp_Serialize_PayloadLengthOverflow( void )
+{
+    RtpResult_t result;
+    RtpContext_t ctx = { 0 };
+    RtpPacket_t packet = { 0 };
+    size_t rtpBufferLength = RTP_BUFFER_LENGTH;
+
+    Rtp_Init( &( ctx ) );
+
+    packet.payloadLength = SIZE_MAX - 10; /* Large payload causing overflow */
+
+    result = Rtp_Serialize( &( ctx ),
+                            &( packet ),
+                            pRtpBuffer,
+                            &( rtpBufferLength ) );
+
+    TEST_ASSERT_EQUAL( RTP_RESULT_MALFORMED_PACKET,
+                       result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate Rtp_Serialize with zero padding length.
+ */
+void test_Rtp_Serialize_ZeroPaddingLength( void )
+{
+    RtpResult_t result;
+    RtpContext_t ctx = { 0 };
+    RtpPacket_t packet = { 0 };
+    size_t rtpBufferLength = RTP_BUFFER_LENGTH;
+    uint8_t rtpPayload[] = { 0x12, 0x34, 0x56, 0x00 };
+
+    Rtp_Init( &( ctx ) );
+
+    packet.header.flags = RTP_HEADER_FLAG_PADDING;
+    packet.pPayload = rtpPayload;
+    packet.payloadLength = sizeof( rtpPayload );
+
+    result = Rtp_Serialize( &( ctx ),
+                            &( packet ),
+                            pRtpBuffer,
+                            &( rtpBufferLength ) );
+
+    TEST_ASSERT_EQUAL( RTP_RESULT_MALFORMED_PACKET,
+                       result );
 }
 
 /*-----------------------------------------------------------*/
@@ -1448,6 +1527,39 @@ void test_Rtp_DeSerialize_InsufficientExtensionPayloadData( void )
 
     TEST_ASSERT_EQUAL( RTP_RESULT_MALFORMED_PACKET,
                        result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate Rtp_DeSerialize with zero padding octets.
+ */
+void test_Rtp_DeSerialize_ZeroPaddingOctets( void )
+{
+    RtpResult_t result;
+    RtpContext_t ctx = { 0 };
+    RtpPacket_t packet = { 0 };
+    uint8_t serializedPacket[] =
+    {
+        /* RTP header: V = 2, P = 1, PT = 0x60, Sequence Number = 0x04D2. */
+        0xA0, 0x60, 0x04, 0xD2,
+        /* Timestamp. */
+        0x12, 0x34, 0x56, 0x78,
+        /* SSRC. */
+        0x9A, 0xBC, 0xDE, 0xFF,
+        /* RTP payload with 0 padding octets. */
+        0x12, 0x34, 0x56, 0x00
+    };
+
+    result = Rtp_Init( &( ctx ) );
+    TEST_ASSERT_EQUAL( RTP_RESULT_OK, result );
+
+    result = Rtp_DeSerialize( &( ctx ),
+                              &( serializedPacket[ 0 ] ),
+                              sizeof( serializedPacket ),
+                              &( packet ) );
+
+    TEST_ASSERT_EQUAL( RTP_RESULT_MALFORMED_PACKET, result );
 }
 
 /*-----------------------------------------------------------*/

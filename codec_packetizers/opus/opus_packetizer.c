@@ -39,6 +39,7 @@ OpusResult_t OpusPacketizer_GetPacket( OpusPacketizerContext_t * pCtx,
 
     if( ( pCtx == NULL ) ||
         ( pPacket == NULL ) ||
+        ( pPacket->pPacketData == NULL ) ||
         ( pPacket->packetDataLength == 0 ) )
     {
         result = OPUS_RESULT_BAD_PARAM;

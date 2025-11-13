@@ -115,25 +115,36 @@ static H265Result_t PacketizeFragmentationUnitPacket( H265PacketizerContext_t * 
         pPacket->pPacketData[ FU_HEADER_OFFSET ] = fuHeader;
 
         /* Write NALU data. */
-        memcpy( ( void * ) &( pPacket->pPacketData[ FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE ] ),
-                ( const void * ) &( pNaluData[ pCtx->fuPacketizationState.naluDataIndex ] ),
-                naluDataLengthToSend );
-        pPacket->packetDataLength = naluDataLengthToSend + FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE;
-
-        pCtx->fuPacketizationState.naluDataIndex += naluDataLengthToSend;
-        pCtx->fuPacketizationState.remainingNaluLength -= naluDataLengthToSend;
-
-        if( pCtx->fuPacketizationState.remainingNaluLength == 0 )
+        if( ( pCtx->fuPacketizationState.naluDataIndex + naluDataLengthToSend ) > pCtx->pNaluArray[ pCtx->tailIndex ].naluDataLength )
         {
-            /* Reset state. */
-            memset( &( pCtx->fuPacketizationState ),
-                    0,
-                    sizeof( FuPacketizationState_t ) );
-            pCtx->currentlyProcessingPacket = H265_PACKET_NONE;
+            result = H265_RESULT_MALFORMED_PACKET;
+        }
+        else
+        {
+            memcpy( ( void * ) &( pPacket->pPacketData[ FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE ] ),
+                    ( const void * ) &( pNaluData[ pCtx->fuPacketizationState.naluDataIndex ] ),
+                    naluDataLengthToSend );
+        }
 
-            /* Move to the next NALU in the next call to H265Packetizer_GetPacket. */
-            pCtx->tailIndex += 1;
-            pCtx->naluCount -= 1;
+        if( result == H265_RESULT_OK )
+        {
+            pPacket->packetDataLength = naluDataLengthToSend + FU_PAYLOAD_HEADER_SIZE + FU_HEADER_SIZE;
+
+            pCtx->fuPacketizationState.naluDataIndex += naluDataLengthToSend;
+            pCtx->fuPacketizationState.remainingNaluLength -= naluDataLengthToSend;
+
+            if( pCtx->fuPacketizationState.remainingNaluLength == 0 )
+            {
+                /* Reset state. */
+                memset( &( pCtx->fuPacketizationState ),
+                        0,
+                        sizeof( FuPacketizationState_t ) );
+                pCtx->currentlyProcessingPacket = H265_PACKET_NONE;
+
+                /* Move to the next NALU in the next call to H265Packetizer_GetPacket. */
+                pCtx->tailIndex += 1;
+                pCtx->naluCount -= 1;
+            }
         }
     }
 
@@ -182,6 +193,7 @@ static void PacketizeAggregationPacket( H265PacketizerContext_t * pCtx,
     /* Write TID in the payload header. */
     pPacket->pPacketData[ 1 ] |= ( minTemporalId << NALU_HEADER_TID_LOCATION );
 
+    /* Update context state. */
     pCtx->tailIndex += nalusToAggregate;
     pCtx->naluCount -= nalusToAggregate;
 
@@ -356,11 +368,18 @@ H265Result_t H265Packetizer_AddNalu( H265PacketizerContext_t * pCtx,
 
     if( result == H265_RESULT_OK )
     {
-        pCtx->pNaluArray[ pCtx->headIndex ].pNaluData = pNalu->pNaluData;
-        pCtx->pNaluArray[ pCtx->headIndex ].naluDataLength = pNalu->naluDataLength;
+        if( pCtx->headIndex < pCtx->naluArrayLength )
+        {
+            pCtx->pNaluArray[ pCtx->headIndex ].pNaluData = pNalu->pNaluData;
+            pCtx->pNaluArray[ pCtx->headIndex ].naluDataLength = pNalu->naluDataLength;
 
-        pCtx->headIndex += 1;
-        pCtx->naluCount += 1;
+            pCtx->headIndex += 1;
+            pCtx->naluCount += 1;
+        }
+        else
+        {
+            result = H265_RESULT_OUT_OF_MEMORY;
+        }
     }
 
     return result;
@@ -392,6 +411,23 @@ H265Result_t H265Packetizer_GetPacket( H265PacketizerContext_t * pCtx,
         }
     }
 
+    /* Validate tailIndex bounds */
+    if( result == H265_RESULT_OK )
+    {
+        if( pCtx->tailIndex >= pCtx->naluArrayLength )
+        {
+            result = H265_RESULT_OUT_OF_MEMORY;
+        }
+        else if( pCtx->pNaluArray[ pCtx->tailIndex ].pNaluData == NULL )
+        {
+            result = H265_RESULT_BAD_PARAM;
+        }
+        else if( pCtx->pNaluArray[ pCtx->tailIndex ].naluDataLength == 0 )
+        {
+            result = H265_RESULT_MALFORMED_PACKET;
+        }
+    }
+
     if( result == H265_RESULT_OK )
     {
         /* Are we in the middle of packetizing fragments of a NALU? */
@@ -411,6 +447,11 @@ H265Result_t H265Packetizer_GetPacket( H265PacketizerContext_t * pCtx,
                 aggregatePacketSize = AP_HEADER_SIZE;
                 for( i = 0; i < pCtx->naluCount; i++ )
                 {
+                    if( ( pCtx->tailIndex + i ) >= pCtx->naluArrayLength )
+                    {
+                        result = H265_RESULT_OUT_OF_MEMORY;
+                        break;
+                    }
                     naluSize = pCtx->pNaluArray[ pCtx->tailIndex + i ].naluDataLength;
 
                     /* Can we fit in this NAL unit? */
@@ -426,17 +467,20 @@ H265Result_t H265Packetizer_GetPacket( H265PacketizerContext_t * pCtx,
                 }
 
                 /* If we can aggregate more than one NAL units, use Aggregation Packet. */
-                if( nalusToAggregate > 1 )
+                if( result == H265_RESULT_OK )
                 {
-                    PacketizeAggregationPacket( pCtx,
-                                                nalusToAggregate,
+                    if( nalusToAggregate > 1 )
+                    {
+                        PacketizeAggregationPacket( pCtx,
+                                                   nalusToAggregate,
+                                                   pPacket );
+                    }
+                    else
+                    {
+                        /* Otherwise, use Single NAL Unit Packet. */
+                        PacketizeSingleNaluPacket( pCtx,
                                                 pPacket );
-                }
-                else
-                {
-                    /* Otherwise, use Single NAL Unit Packet. */
-                    PacketizeSingleNaluPacket( pCtx,
-                                               pPacket );
+                    }
                 }
             }
             else

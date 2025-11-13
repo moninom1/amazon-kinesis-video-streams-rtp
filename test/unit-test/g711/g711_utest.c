@@ -162,6 +162,22 @@ void test_G711_Packetizer_GetPacket_BadParams( void )
                                        &( pkt ) );
     TEST_ASSERT_EQUAL( G711_RESULT_BAD_PARAM,
                        result );
+
+    pkt.pPacketData = NULL;
+    pkt.packetDataLength = PACKETIZATION_BUFFER_LENGTH;
+    result = G711Packetizer_GetPacket( &( ctx ), &( pkt ) );
+    TEST_ASSERT_EQUAL( G711_RESULT_BAD_PARAM, result );
+
+    ctx.frame.pFrameData = NULL;
+    pkt.pPacketData = &( packetizationBuffer[ 0 ] );
+    result = G711Packetizer_GetPacket( &( ctx ), &( pkt ) );
+    TEST_ASSERT_EQUAL( G711_RESULT_BAD_PARAM, result );
+
+    ctx.frame.pFrameData = &( packetizationBuffer[ 0 ] );
+    ctx.curFrameDataIndex = 2;
+    ctx.frame.frameDataLength = 0;
+    result = G711Packetizer_GetPacket( &( ctx ), &( pkt ) );
+    TEST_ASSERT_EQUAL( G711_RESULT_BAD_PARAM, result );
 }
 
 /* ==============================  Test Cases for Depacketization ============================== */
@@ -303,6 +319,20 @@ void test_G711_Depacketizer_AddPacket_BadParams( void )
                                          NULL );
     TEST_ASSERT_EQUAL( G711_RESULT_BAD_PARAM,
                        result );
+
+    pkt.pPacketData = NULL;
+    pkt.packetDataLength = sizeof( packetData );
+    result = G711Depacketizer_AddPacket( &( ctx ),
+                                         &( pkt ) );
+    TEST_ASSERT_EQUAL( G711_RESULT_BAD_PARAM,
+                       result );
+
+    pkt.pPacketData = &( packetData[ 0 ] );
+    pkt.packetDataLength = 0;
+    result = G711Depacketizer_AddPacket( &( ctx ),
+                                         &( pkt ) );
+    TEST_ASSERT_EQUAL( G711_RESULT_BAD_PARAM,
+                       result );
 }
 
 /*-----------------------------------------------------------*/
@@ -422,6 +452,33 @@ void test_G711_Depacketizer_GetFrame_OutOfMemory( void )
                        result );
 }
 
+/**
+ * @brief Validate G711_Depacketizer_GetFrame when packet size exceeds remaining frame space.
+ */
+void test_G711_Depacketizer_GetFrame_CurrentIndexEqualsFrameLength( void )
+{
+    G711Result_t result;
+    G711DepacketizerContext_t ctx = { 0 };
+    G711Packet_t packetsArray[ MAX_PACKET_IN_A_FRAME ];
+    G711Frame_t frame;
+    uint8_t packetData[] = { 0x01, 0x02, 0x03 };
+
+    result = G711Depacketizer_Init( &( ctx ), &( packetsArray[ 0 ] ), MAX_PACKET_IN_A_FRAME );
+    TEST_ASSERT_EQUAL( G711_RESULT_OK, result );
+
+    ctx.pPacketsArray[ 0 ].pPacketData = packetData;
+    ctx.pPacketsArray[ 0 ].packetDataLength = 1;
+    ctx.pPacketsArray[ 1 ].pPacketData = packetData;
+    ctx.pPacketsArray[ 1 ].packetDataLength = 3;
+    ctx.packetCount = 2;
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = 2;
+    result = G711Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( G711_RESULT_OUT_OF_MEMORY, result );
+}
+
 /*-----------------------------------------------------------*/
 
 /**
@@ -455,6 +512,60 @@ void test_G711_Depacketizer_GetPacketProperties_BadParams( void )
                                                    NULL );
     TEST_ASSERT_EQUAL( G711_RESULT_BAD_PARAM,
                        result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Validate G711_Depacketizer_GetFrame when currentFrameDataIndex equals frameDataLength.
+ */
+void test_G711_Depacketizer_GetFrame_IndexEqualsLength( void )
+{
+    G711Result_t result;
+    G711DepacketizerContext_t ctx = { 0 };
+    G711Packet_t packetsArray[ MAX_PACKET_IN_A_FRAME ];
+    G711Frame_t frame;
+    uint8_t packetData[] = { 0x01, 0x02 };
+
+    result = G711Depacketizer_Init( &( ctx ), &( packetsArray[ 0 ] ), MAX_PACKET_IN_A_FRAME );
+    TEST_ASSERT_EQUAL( G711_RESULT_OK, result );
+
+    ctx.pPacketsArray[ 0 ].pPacketData = packetData;
+    ctx.pPacketsArray[ 0 ].packetDataLength = 2;
+    ctx.pPacketsArray[ 1 ].pPacketData = packetData;
+    ctx.pPacketsArray[ 1 ].packetDataLength = 1;
+    ctx.packetCount = 2;
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = 2;
+    result = G711Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( G711_RESULT_OUT_OF_MEMORY, result );
+}
+
+/*-----------------------------------------------------------*/
+/**
+ * @brief Validate G711_Depacketizer_GetFrame with NULL packet data in loop.
+ */
+void test_G711_Depacketizer_GetFrame_NullPacketInLoop( void )
+{
+    G711Result_t result;
+    G711DepacketizerContext_t ctx = { 0 };
+    G711Packet_t packetsArray[ MAX_PACKET_IN_A_FRAME ];
+    G711Frame_t frame;
+
+    result = G711Depacketizer_Init( &( ctx ), &( packetsArray[ 0 ] ), MAX_PACKET_IN_A_FRAME );
+    TEST_ASSERT_EQUAL( G711_RESULT_OK, result );
+
+    ctx.pPacketsArray[ 0 ].pPacketData = NULL;
+    ctx.pPacketsArray[ 0 ].packetDataLength = 1;
+    ctx.packetCount = 1;
+
+    frame.pFrameData = &( frameBuffer[ 0 ] );
+    frame.frameDataLength = MAX_FRAME_LENGTH;
+    result = G711Depacketizer_GetFrame( &( ctx ), &( frame ) );
+
+    TEST_ASSERT_EQUAL( G711_RESULT_OUT_OF_MEMORY, result );
 }
 
 /*-----------------------------------------------------------*/

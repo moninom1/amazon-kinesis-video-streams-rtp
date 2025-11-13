@@ -39,7 +39,10 @@ G711Result_t G711Packetizer_GetPacket( G711PacketizerContext_t * pCtx,
 
     if( ( pCtx == NULL ) ||
         ( pPacket == NULL ) ||
-        ( pPacket->packetDataLength == 0 ) )
+        ( pPacket->pPacketData == NULL ) ||
+        ( pPacket->packetDataLength == 0 ) ||
+        ( pCtx->frame.pFrameData == NULL ) ||
+        ( pCtx->curFrameDataIndex > pCtx->frame.frameDataLength ) )
     {
         result = G711_RESULT_BAD_PARAM;
     }

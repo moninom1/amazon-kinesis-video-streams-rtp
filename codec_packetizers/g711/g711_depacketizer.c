@@ -35,7 +35,9 @@ G711Result_t G711Depacketizer_AddPacket( G711DepacketizerContext_t * pCtx,
     G711Result_t result = G711_RESULT_OK;
 
     if( ( pCtx == NULL ) ||
-        ( pPacket == NULL ) )
+        ( pPacket == NULL ) ||
+        ( pPacket->pPacketData == NULL ) ||
+        ( pPacket->packetDataLength == 0 ) )
     {
         result = G711_RESULT_BAD_PARAM;
     }
@@ -79,7 +81,9 @@ G711Result_t G711Depacketizer_GetFrame( G711DepacketizerContext_t * pCtx,
     {
         pPacket = &( pCtx->pPacketsArray[ i ] );
 
-        if( ( pFrame->frameDataLength - currentFrameDataIndex ) >= pPacket->packetDataLength )
+        if( ( pPacket->pPacketData != NULL ) &&
+            ( currentFrameDataIndex < pFrame->frameDataLength ) &&
+            ( ( pFrame->frameDataLength - currentFrameDataIndex ) >= pPacket->packetDataLength ) )
         {
             memcpy( ( void * ) &( pFrame->pFrameData[ currentFrameDataIndex ] ),
                     ( const void * ) &( pPacket->pPacketData[ 0 ] ),

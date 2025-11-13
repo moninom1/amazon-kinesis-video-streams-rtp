@@ -67,23 +67,48 @@
 
 /*-----------------------------------------------------------*/
 
-static size_t CalculateSerializedPacketLength( const RtpPacket_t * pRtpPacket );
+static RtpResult_t CalculateSerializedPacketLength( const RtpPacket_t * pRtpPacket,
+                                                    size_t * pLength );
 
 /*-----------------------------------------------------------*/
 
-static size_t CalculateSerializedPacketLength( const RtpPacket_t * pRtpPacket )
+static RtpResult_t CalculateSerializedPacketLength( const RtpPacket_t * pRtpPacket,
+                                                    size_t * pLength )
 {
-    size_t headerLength = RTP_HEADER_MIN_LENGTH +
-                          ( pRtpPacket->header.csrcCount * sizeof( uint32_t ) );
+    RtpResult_t result = RTP_RESULT_OK;
+    size_t headerLength;
 
-    if( ( pRtpPacket->header.flags & RTP_HEADER_FLAG_EXTENSION ) != 0 )
+    /* Validate CSRC count - RTP spec limits to 4 bits (0-15) */
+    if( pRtpPacket->header.csrcCount > 15 )
     {
-        headerLength = headerLength +
-                       4 + /* Extension header. */
-                       ( pRtpPacket->header.extension.extensionPayloadLength * sizeof( uint32_t ) );
+        result = RTP_RESULT_MALFORMED_PACKET;
     }
 
-    return headerLength + pRtpPacket->payloadLength;
+    if( result == RTP_RESULT_OK )
+    {
+        headerLength = RTP_HEADER_MIN_LENGTH +
+                       ( pRtpPacket->header.csrcCount * sizeof( uint32_t ) );
+
+        if( ( pRtpPacket->header.flags & RTP_HEADER_FLAG_EXTENSION ) != 0 )
+        {
+            headerLength += 4 + ( pRtpPacket->header.extension.extensionPayloadLength * sizeof( uint32_t ) );
+        }
+    }
+
+    if( result == RTP_RESULT_OK )
+    {
+        /* Check for overflow in final addition */
+        if( ( SIZE_MAX - headerLength ) < pRtpPacket->payloadLength )
+        {
+            result = RTP_RESULT_MALFORMED_PACKET;
+        }
+        else
+        {
+            *pLength = headerLength + pRtpPacket->payloadLength;
+        }
+    }
+
+    return result;
 }
 
 /*-----------------------------------------------------------*/
@@ -126,8 +151,11 @@ RtpResult_t Rtp_Serialize( RtpContext_t * pCtx,
 
     if( result == RTP_RESULT_OK )
     {
-        serializedPacketLength = CalculateSerializedPacketLength( pRtpPacket );
+        result = CalculateSerializedPacketLength( pRtpPacket, &serializedPacketLength );
+    }
 
+    if( result == RTP_RESULT_OK )
+    {
         if( ( pBuffer != NULL ) &&
             ( *pLength < serializedPacketLength ) )
         {
@@ -222,10 +250,11 @@ RtpResult_t Rtp_Serialize( RtpContext_t * pCtx,
                  * ignored, including itself. */
                 numPaddingOctets = pRtpPacket->pPayload[ pRtpPacket->payloadLength - 1 ];
 
-                if( numPaddingOctets > pRtpPacket->payloadLength )
+                if( ( numPaddingOctets == 0 ) ||
+                    ( numPaddingOctets > pRtpPacket->payloadLength ) )
                 {
-                    /* The number of padding octets cannot be larger than the
-                     * payload length. */
+                    /* The number of padding octets must be > 0 and cannot be
+                     * larger than the payload length. */
                     result = RTP_RESULT_MALFORMED_PACKET;
                 }
             }
@@ -305,7 +334,7 @@ RtpResult_t Rtp_DeSerialize( RtpContext_t * pCtx,
         if( pRtpPacket->header.csrcCount > 0 )
         {
             /* Is there enough data to read CSRCs? */
-            if( ( currentIndex + ( pRtpPacket->header.csrcCount * sizeof( uint32_t ) ) ) <= serializedPacketLength )
+            if( ( pRtpPacket->header.csrcCount * sizeof( uint32_t ) ) <= ( serializedPacketLength - currentIndex ) )
             {
                 pRtpPacket->header.pCsrc = ( uint32_t * ) &( pSerializedPacket[ currentIndex ] );
 
@@ -335,7 +364,7 @@ RtpResult_t Rtp_DeSerialize( RtpContext_t * pCtx,
             pRtpPacket->header.flags |= RTP_HEADER_FLAG_EXTENSION;
 
             /* Is there enough data to read extension header? */
-            if( ( currentIndex + sizeof( uint32_t ) ) <= serializedPacketLength )
+            if( sizeof( uint32_t ) <= ( serializedPacketLength - currentIndex ) )
             {
                 extensionHeader = RTP_READ_UINT32( &( pSerializedPacket[ currentIndex ] ) );
                 currentIndex += 4;
@@ -355,9 +384,8 @@ RtpResult_t Rtp_DeSerialize( RtpContext_t * pCtx,
             if( result == RTP_RESULT_OK )
             {
                 /* Is there enough data to read extension payload? */
-                if( ( currentIndex +
-                      ( pRtpPacket->header.extension.extensionPayloadLength *
-                        sizeof( uint32_t ) ) ) <= serializedPacketLength )
+                if( ( pRtpPacket->header.extension.extensionPayloadLength *
+                      sizeof( uint32_t ) ) <= ( serializedPacketLength - currentIndex ) )
                 {
                     pRtpPacket->header.extension.pExtensionPayload = ( uint32_t * ) &( pSerializedPacket[ currentIndex ] );
 
@@ -391,14 +419,15 @@ RtpResult_t Rtp_DeSerialize( RtpContext_t * pCtx,
                  * ignored, including itself. */
                 numPaddingOctets = pRtpPacket->pPayload[ pRtpPacket->payloadLength - 1 ];
 
-                if( numPaddingOctets <= pRtpPacket->payloadLength )
+                if( ( numPaddingOctets > 0 ) &&
+                    ( numPaddingOctets <= pRtpPacket->payloadLength ) )
                 {
                     pRtpPacket->payloadLength -= numPaddingOctets;
                 }
                 else
                 {
-                    /* The number of padding octets cannot be larger than the
-                     * payload length. */
+                    /* The number of padding octets must be > 0 and cannot be
+                     * larger than the payload length. */
                     result = RTP_RESULT_MALFORMED_PACKET;
                 }
             }
