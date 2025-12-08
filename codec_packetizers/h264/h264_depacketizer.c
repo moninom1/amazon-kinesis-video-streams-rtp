@@ -88,7 +88,8 @@ static H264Result_t DepacketizeFragmentationUnitPacket( H264DepacketizerContext_
 
         /* Write NALU payload. */
         payloadLength = curPacketLength - FU_A_HEADER_SIZE;
-        if( ( curNaluDataIndex + payloadLength ) <= pNalu->naluDataLength )
+        if( ( payloadLength <= pNalu->naluDataLength ) &&
+            ( curNaluDataIndex <= ( pNalu->naluDataLength - payloadLength ) ) )
         {
             memcpy( ( void * ) &( pNalu->pNaluData[ curNaluDataIndex ] ),
                     ( const void * ) &( pCurPacketData[ FU_A_PAYLOAD_OFFSET ] ),
