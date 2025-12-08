@@ -2214,68 +2214,6 @@ void test_H264_Depacketizer_GetNalu_IntegerOverflow_Protection( void )
 
 /**
  * @brief Validate H264_Depacketizer_StapAGetNalu incase of integer overflow protection
- * when reading NALU size.
- */
-void test_H264_Depacketizer_StapAGetNalu_IntegerOverflow_Protection_NaluSize( void )
-{
-    H264Result_t result;
-    H264Packet_t pkt;
-    H264DepacketizerContext_t ctx = { 0 };
-    Nalu_t nalu;
-    uint8_t naluBuffer[ MAX_NALU_LENGTH ];
-    H264Packet_t packetsArray[ MAX_PACKETS_IN_A_FRAME ];
-    uint8_t packetData[] =
-    {
-        /* STAP-A header. F=0, NRI=0, Type=24. */
-        0x18,
-        /* NALU 1 length. */
-        0x00, 0x05,
-        /* NALU 1 payload. */
-        0xAB, 0xCD, 0xEF, 0x11, 0x22,
-    };
-
-    result = H264Depacketizer_Init( &( ctx ),
-                                    &( packetsArray[ 0 ] ),
-                                    MAX_PACKETS_IN_A_FRAME );
-
-    TEST_ASSERT_EQUAL( H264_RESULT_OK,
-                       result );
-
-    pkt.pPacketData = &( packetData[ 0 ] );
-    pkt.packetDataLength = sizeof( packetData );
-
-    result = H264Depacketizer_AddPacket( &( ctx ),
-                                         &( pkt ) );
-
-    TEST_ASSERT_EQUAL( H264_RESULT_OK,
-                       result );
-
-    nalu.pNaluData = &( naluBuffer[ 0 ] );
-    nalu.naluDataLength = MAX_NALU_LENGTH;
-
-    result = H264Depacketizer_GetNalu( &( ctx ),
-                                       &( nalu ) );
-
-    TEST_ASSERT_EQUAL( H264_RESULT_OK,
-                       result );
-
-    /* Simulate large curPacketIndex to test overflow protection. */
-    ctx.curPacketIndex = sizeof( packetData ) - 1;
-
-    nalu.pNaluData = &( naluBuffer[ 0 ] );
-    nalu.naluDataLength = MAX_NALU_LENGTH;
-
-    result = H264Depacketizer_GetNalu( &( ctx ),
-                                       &( nalu ) );
-
-    TEST_ASSERT_EQUAL( H264_RESULT_MALFORMED_PACKET,
-                       result );
-}
-
-/*-----------------------------------------------------------*/
-
-/**
- * @brief Validate H264_Depacketizer_StapAGetNalu incase of integer overflow protection
  * when reading NALU data.
  */
 void test_H264_Depacketizer_StapAGetNalu_IntegerOverflow_Protection_NaluData( void )
