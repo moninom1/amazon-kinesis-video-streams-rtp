@@ -2213,9 +2213,9 @@ void test_H264_Depacketizer_GetNalu_IntegerOverflow_Protection( void )
 /*-----------------------------------------------------------*/
 
 /**
- * @brief Validate H264_Depacketizer_StapAGetNalu incase of integer overflow protection
- * when reading NALU data.
-
+ * @brief Validate H264_Depacketizer_GetNalu incase of integer overflow protection
+ * with payloadLength exceeding buffer.
+ */
 void test_H264_Depacketizer_GetNalu_IntegerOverflow_PayloadExceedsBuffer( void )
 {
     H264Result_t result;
@@ -2261,9 +2261,9 @@ void test_H264_Depacketizer_GetNalu_IntegerOverflow_PayloadExceedsBuffer( void )
 /*-----------------------------------------------------------*/
 
 /**
- * @brief Test STAP-A packet with length less than STAP_A_NALU_SIZE (2 bytes).
- * This tests line 135: STAP_A_NALU_SIZE <= curPacketLength
-
+ * @brief Validate H264_Depacketizer_StapAGetNalu incase of integer overflow protection
+ * when reading NALU data.
+ */
 void test_H264_Depacketizer_StapAGetNalu_IntegerOverflow_Protection_NaluData( void )
 {
     H264Result_t result;
@@ -2311,8 +2311,8 @@ void test_H264_Depacketizer_StapAGetNalu_IntegerOverflow_Protection_NaluData( vo
 /*-----------------------------------------------------------*/
 
 /**
- * @brief Validate H264_Depacketizer_GetNalu incase of integer overflow protection
- * with payloadLength exceeding buffer.
+ * @brief Test STAP-A packet with length less than STAP_A_NALU_SIZE (2 bytes).
+ * This tests line 135: STAP_A_NALU_SIZE <= curPacketLength
  */
 void test_H264_Depacketizer_StapAGetNalu_PacketTooSmall( void )
 {
