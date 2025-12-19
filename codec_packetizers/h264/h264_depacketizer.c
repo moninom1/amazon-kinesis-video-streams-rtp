@@ -132,7 +132,7 @@ static H264Result_t DepacketizeAggregationPacket( H264DepacketizerContext_t * pC
     }
 
     /* Is there enough data left in the packet to read the next NALU size? */
-    if( ( STAP_A_NALU_SIZE <= curPacketLength ) &&
+    if( ( curPacketLength >= STAP_A_NALU_SIZE ) &&
         ( pCtx->curPacketIndex <= ( curPacketLength - STAP_A_NALU_SIZE ) ) )
     {
         /* Read NALU length. */
